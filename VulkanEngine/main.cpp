@@ -152,7 +152,7 @@ namespace ve {
 				std::cout << "Error on VideoEncoder frame finish\n";
 			}
 
-			if (!g_writeFrames || timeSinceLastWrite < TIME_BETWEEN_WRITES)
+			if (!g_writeFrames /*|| timeSinceLastWrite < TIME_BETWEEN_WRITES*/)
 				return;
 			timeSinceLastWrite = 0.0;
 

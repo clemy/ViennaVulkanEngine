@@ -634,13 +634,6 @@ namespace ve
 			m_pRenderer->drawOverlay();			//draw overlay in the subrenderer
 			m_AvgDrawOvlTime = vh::vhAverage(vh::vhTimeDuration(t_now), m_AvgDrawOvlTime);
 
-			//----------------------------------------------------------------------------------
-			//Frame ended
-
-			t_now = vh::vhTimeNow();
-			event.type = veEvent::VE_EVENT_FRAME_ENDED;	//notify all listeners that the frame ended, e.g. fill cmd buffers for overlay
-			callListeners(m_dt, event);
-			m_AvgEndedTime = vh::vhAverage(vh::vhTimeDuration(t_now), m_AvgEndedTime);
 
 			//----------------------------------------------------------------------------------
 			//present the finished frame
@@ -648,6 +641,14 @@ namespace ve
 			t_now = vh::vhTimeNow();
 			m_pRenderer->presentFrame();		//present the next frame
 			m_AvgPresentTime = vh::vhAverage(vh::vhTimeDuration(t_now), m_AvgPresentTime);
+
+			//----------------------------------------------------------------------------------
+			//Frame ended
+
+			t_now = vh::vhTimeNow();
+			event.type = veEvent::VE_EVENT_FRAME_ENDED;	//notify all listeners that the frame ended, e.g. fill cmd buffers for overlay
+			callListeners(m_dt, event);
+			m_AvgEndedTime = vh::vhAverage(vh::vhTimeDuration(t_now), m_AvgEndedTime);
 
 			m_loopCount++;
 		}
