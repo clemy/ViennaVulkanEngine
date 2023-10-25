@@ -8,6 +8,7 @@ namespace vh {
 	class VHVideoEncoder {
 	public:
 		VkResult init(
+			VkPhysicalDevice physicalDevice,
 			VkDevice device,
 			VmaAllocator allocator,
 			uint32_t computeQueueFamily, VkQueue computeQueue, VkCommandPool computeCommandPool,
@@ -41,6 +42,7 @@ namespace vh {
 
 		bool m_initialized{ false };
 		bool m_running{ false };
+		VkPhysicalDevice m_physicalDevice;
 		VkDevice m_device;
 		VmaAllocator m_allocator;
 		VkQueue m_computeQueue;
