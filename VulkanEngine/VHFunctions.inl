@@ -180,7 +180,17 @@ VK_DEVICE_LEVEL_FUNCTION(vkDestroyAccelerationStructureKHR)
 VK_DEVICE_LEVEL_FUNCTION(vkCreateRayTracingPipelinesKHR)
 VK_DEVICE_LEVEL_FUNCTION(vkGetRayTracingShaderGroupHandlesKHR)
 VK_DEVICE_LEVEL_FUNCTION(vkCmdTraceRaysKHR)
+
+// Video Extension Function Binding
+VK_DEVICE_LEVEL_FUNCTION(vkCreateVideoSessionKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkDestroyVideoSessionKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkGetVideoSessionMemoryRequirementsKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkBindVideoSessionMemoryKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkCreateVideoSessionParametersKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkDestroyVideoSessionParametersKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkCmdBeginVideoCodingKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkCmdControlVideoCodingKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkCmdEndVideoCodingKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkCmdDecodeVideoKHR)
+
 #undef VK_DEVICE_LEVEL_FUNCTION
-
-
-

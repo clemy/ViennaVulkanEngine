@@ -32,6 +32,14 @@ namespace ve
 		const std::vector<const char *> requiredDeviceExtensions = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
+		const std::vector<const char*> requiredDeviceExtensionsWithVideo = {
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+			VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,
+			VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME,
+			VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME
+		};
+
 		const std::vector<const char *> requiredValidationLayers = {
 			"VK_LAYER_LUNARG_standard_validation" };
 
@@ -39,12 +47,35 @@ namespace ve
 		enabledBufferDeviceAddresFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
 		enabledBufferDeviceAddresFeatures.bufferDeviceAddress = VK_TRUE;
 
-		if (vh::vhDevPickPhysicalDevice(getEnginePointer()->getInstance(), m_surface, requiredDeviceExtensions,
-			&m_physicalDevice, &m_deviceFeatures, &m_deviceLimits) != VK_SUCCESS ||
-			vh::vhDevCreateLogicalDevice(getEnginePointer()->getInstance(), m_physicalDevice, m_surface,
+		if (vh::vhDevPickPhysicalDevice(getEnginePointer()->getInstance(), m_surface, requiredDeviceExtensionsWithVideo,
+			&m_physicalDevice, &m_deviceFeatures, &m_deviceLimits, true) == VK_SUCCESS)
+		{
+			m_videoDecodeAvailable = true;
+
+			if (vh::vhDevCreateLogicalDevice(getEnginePointer()->getInstance(), m_physicalDevice, m_surface,
+				requiredDeviceExtensionsWithVideo, requiredValidationLayers,
+				&enabledBufferDeviceAddresFeatures, &m_device,
+				&m_graphicsQueue, &m_presentQueue, &m_videoDecodeQueue) != VK_SUCCESS)
+			{
+				assert(false);
+				exit(1);
+			}
+		}
+		else if (vh::vhDevPickPhysicalDevice(getEnginePointer()->getInstance(), m_surface, requiredDeviceExtensions,
+				&m_physicalDevice, &m_deviceFeatures, &m_deviceLimits) == VK_SUCCESS)
+		{
+			m_videoDecodeAvailable = false;
+
+			if (vh::vhDevCreateLogicalDevice(getEnginePointer()->getInstance(), m_physicalDevice, m_surface,
 				requiredDeviceExtensions, requiredValidationLayers,
-				&enabledBufferDeviceAddresFeatures, &m_device, &m_graphicsQueue,
-				&m_presentQueue) != VK_SUCCESS)
+				&enabledBufferDeviceAddresFeatures, &m_device,
+				&m_graphicsQueue, &m_presentQueue) != VK_SUCCESS)
+			{
+				assert(false);
+				exit(1);
+			}
+		}
+		else
 		{
 			assert(false);
 			exit(1);
@@ -80,6 +111,11 @@ namespace ve
 			m_secondaryBuffers[i] = {}; //will be created later
 
 		m_secondaryBuffersFutures.resize(m_swapChainImages.size());
+
+		if (m_videoDecodeAvailable) {
+			vh::vhCmdCreateVideoDecodeCommandPool(m_physicalDevice, m_device, m_surface,
+				&m_videoDecodeCommandPool); //command pool for video decoding
+		}
 
 		//------------------------------------------------------------------------------------------------------------
 		//create resources for light pass

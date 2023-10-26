@@ -100,7 +100,7 @@ namespace vh
 		* \returns a structure containing queue family indices of suitable families
 		*
 		*/
-	QueueFamilyIndices vhDevFindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface)
+	QueueFamilyIndices vhDevFindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, bool withVideo)
 	{
 		QueueFamilyIndices indices;
 
@@ -131,7 +131,12 @@ namespace vh
 				indices.presentFamily = i;
 			}
 
-			if (indices.isComplete())
+			if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR)
+			{
+				indices.videoDecodeFamily = i;
+			}
+
+			if (indices.isComplete(withVideo))
 			{
 				break;
 			}
@@ -215,9 +220,9 @@ namespace vh
 		* \returns whether the device supports all required extensions or not
 		*
 		*/
-	bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface, std::vector<const char *> requiredDeviceExtensions)
+	bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface, std::vector<const char *> requiredDeviceExtensions, bool withVideo)
 	{
-		QueueFamilyIndices indices = vhDevFindQueueFamilies(device, surface);
+		QueueFamilyIndices indices = vhDevFindQueueFamilies(device, surface, withVideo);
 
 		bool extensionsSupported = checkDeviceExtensionSupport(device, requiredDeviceExtensions);
 
@@ -231,7 +236,7 @@ namespace vh
 		VkPhysicalDeviceFeatures supportedFeatures;
 		vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
 
-		return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
+		return indices.isComplete(withVideo) && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
 	}
 
 	/**
@@ -247,7 +252,7 @@ namespace vh
 		* \returns VK_SUCCESS or a Vulkan error code
 		*
 		*/
-	VkResult vhDevPickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface, std::vector<const char *> requiredDeviceExtensions, VkPhysicalDevice *physicalDevice, VkPhysicalDeviceFeatures *pFeatures, VkPhysicalDeviceLimits *limits)
+	VkResult vhDevPickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface, std::vector<const char *> requiredDeviceExtensions, VkPhysicalDevice *physicalDevice, VkPhysicalDeviceFeatures *pFeatures, VkPhysicalDeviceLimits *limits, bool withVideo)
 	{
 		uint32_t deviceCount = 0;
 		VHCHECKRESULT(vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr));
@@ -270,7 +275,7 @@ namespace vh
 
 		for (const auto device : devices)
 		{
-			if (isDeviceSuitable(device, surface, requiredDeviceExtensions))
+			if (isDeviceSuitable(device, surface, requiredDeviceExtensions, withVideo))
 			{
 				*physicalDevice = device;
 				break;
@@ -355,12 +360,21 @@ namespace vh
 		* \returns VK_SUCCESS or a Vulkan error code
 		*
 		*/
-	VkResult vhDevCreateLogicalDevice(VkInstance instance, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, std::vector<const char *> requiredDeviceExtensions, std::vector<const char *> requiredValidationLayers, void *pNextChain, VkDevice *device, VkQueue *graphicsQueue, VkQueue *presentQueue)
+	VkResult vhDevCreateLogicalDevice(VkInstance instance, VkPhysicalDevice physicalDevice,
+		VkSurfaceKHR surface,
+		std::vector<const char *> requiredDeviceExtensions, std::vector<const char *> requiredValidationLayers,
+		void *pNextChain, VkDevice *device,
+		VkQueue *graphicsQueue, VkQueue *presentQueue, VkQueue* videoDecodeQueue)
 	{
-		QueueFamilyIndices indices = vhDevFindQueueFamilies(physicalDevice, surface);
+		const bool withVideo = videoDecodeQueue != nullptr;
+		QueueFamilyIndices indices = vhDevFindQueueFamilies(physicalDevice, surface, withVideo);
 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		std::set<int> uniqueQueueFamilies = { indices.graphicsFamily, indices.presentFamily };
+		if (withVideo) {
+			assert(indices.videoDecodeFamily != -1);
+			uniqueQueueFamilies.insert(indices.videoDecodeFamily);
+		}
 
 		float queuePriority = 1.0f;
 		for (int queueFamily : uniqueQueueFamilies)
@@ -419,6 +433,9 @@ namespace vh
 
 		vkGetDeviceQueue(*device, indices.graphicsFamily, 0, graphicsQueue);
 		vkGetDeviceQueue(*device, indices.presentFamily, 0, presentQueue);
+		if (withVideo) {
+			vkGetDeviceQueue(*device, indices.videoDecodeFamily, 0, videoDecodeQueue);
+		}		
 
 		return VK_SUCCESS;
 	}

@@ -70,6 +70,10 @@ namespace ve
 		VmaAllocator m_vmaAllocator; ///<VMA allocator
 		VkCommandPool m_commandPool; ///<Command pool of this thread
 
+		bool m_videoDecodeAvailable = false;
+		VkQueue m_videoDecodeQueue; ///<Vulkan video decode queue
+		VkCommandPool m_videoDecodeCommandPool; ///<Command pool for video decoding
+
 		//surface
 		VkSurfaceKHR m_surface; ///<Vulkan KHR surface
 		VkSurfaceCapabilitiesKHR m_surfaceCapabilities; ///<Surface capabilities
@@ -188,6 +192,18 @@ namespace ve
 		virtual VkCommandPool getCommandPool()
 		{
 			return m_commandPool;
+		};
+
+		///\returns the Vulkan video decode queue
+		virtual VkQueue getVideoDecodeQueue()
+		{
+			return m_videoDecodeQueue;
+		};
+
+		///\returns the video decode command pool
+		virtual VkCommandPool getVideoDecodeCommandPool()
+		{
+			return m_videoDecodeCommandPool;
 		};
 		
 		///\returns pointer to the swap chain framebuffer vector

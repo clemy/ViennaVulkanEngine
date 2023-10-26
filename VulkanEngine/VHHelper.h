@@ -71,11 +71,12 @@ namespace vh
 	{
 		int graphicsFamily = -1; ///<Index of graphics family
 		int presentFamily = -1; ///<Index of present family
+		int videoDecodeFamily = -1; ///<Index of video decode family
 
 		///\returns true if the structure is filled completely
-		bool isComplete()
+		bool isComplete(bool withVideo)
 		{
-			return graphicsFamily >= 0 && presentFamily >= 0;
+			return graphicsFamily >= 0 && presentFamily >= 0 && (!withVideo || videoDecodeFamily >= 0);
 		}
 	};
 
@@ -253,9 +254,9 @@ namespace vh
 
 	//physical device
 	VkResult
-		vhDevPickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface, std::vector<const char *> requiredExtensions, VkPhysicalDevice *physicalDevice, VkPhysicalDeviceFeatures *pFeatures, VkPhysicalDeviceLimits *limits);
+		vhDevPickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface, std::vector<const char *> requiredExtensions, VkPhysicalDevice *physicalDevice, VkPhysicalDeviceFeatures *pFeatures, VkPhysicalDeviceLimits *limits, bool withVideo = false);
 
-	QueueFamilyIndices vhDevFindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
+	QueueFamilyIndices vhDevFindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, bool withVideo = false);
 
 	VkFormat vhDevFindSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
@@ -270,8 +271,7 @@ namespace vh
 		std::vector<const char *> requiredValidationLayers,
 		void *pNextChain,
 		VkDevice *device,
-		VkQueue *graphicsQueue,
-		VkQueue *presentQueue);
+		VkQueue *graphicsQueue, VkQueue *presentQueue, VkQueue* videoDecodeQueue = nullptr);
 
 	//--------------------------------------------------------------------------------------------------------------------------------
 	//swapchain
@@ -434,6 +434,8 @@ namespace vh
 	//--------------------------------------------------------------------------------------------------------------------------------
 	//command
 	VkResult vhCmdCreateCommandPool(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkCommandPool *commandPool);
+
+	VkResult vhCmdCreateVideoDecodeCommandPool(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkCommandPool* commandPool);
 
 	VkResult vhCmdCreateCommandBuffers(VkDevice device, VkCommandPool commandPool, VkCommandBufferLevel level, uint32_t count, VkCommandBuffer *pBuffers);
 
