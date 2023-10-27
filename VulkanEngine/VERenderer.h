@@ -71,8 +71,8 @@ namespace ve
 		VkCommandPool m_commandPool; ///<Command pool of this thread
 
 		bool m_videoDecodeAvailable = false;
-		VkQueue m_videoDecodeQueue; ///<Vulkan video decode queue
-		VkCommandPool m_videoDecodeCommandPool; ///<Command pool for video decoding
+		VkQueue m_videoDecodeQueue = nullptr; ///<Vulkan video decode queue
+		VkCommandPool m_videoDecodeCommandPool = nullptr; ///<Command pool for video decoding
 
 		//surface
 		VkSurfaceKHR m_surface; ///<Vulkan KHR surface

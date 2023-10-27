@@ -157,6 +157,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\BottomLevelASGenerator.cpp" />
+    <ClCompile Include="VHVideoDecoder.cpp" />
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\BottomLevelASGenerator.h" />
     <ClCompile Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\DescriptorSetGenerator.cpp" />
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\DescriptorSetGenerator.h" />
@@ -259,6 +260,8 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\VKHelpers.h" />
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\vk_mem_alloc.h" />
     <ClCompile Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\threadpool\ThreadPool.cpp" />
+    <ClInclude Include="H264ParameterSet.h" />
+    <ClInclude Include="VHVideoDecoder.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\ZERO_CHECK.vcxproj">

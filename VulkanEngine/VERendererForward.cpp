@@ -328,6 +328,8 @@ namespace ve
 			vkDestroyFence(m_device, m_inFlightFences[i], nullptr);
 		}
 
+		if (m_videoDecodeAvailable)
+			vkDestroyCommandPool(m_device, m_videoDecodeCommandPool, nullptr);
 		vkDestroyCommandPool(m_device, m_commandPool, nullptr);
 		for (auto pool : m_commandPools)
 			vkDestroyCommandPool(m_device, pool, nullptr);

@@ -166,6 +166,9 @@
     <ClCompile Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\threadpool\ThreadPool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VHVideoDecoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\BottomLevelASGenerator.h">
@@ -310,6 +313,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\vk_mem_alloc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VHVideoDecoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="H264ParameterSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -147,6 +147,28 @@ namespace vh
 		return indices;
 	}
 
+	//-------------------------------------------------------------------------------------------------------
+/**
+	*
+	* \brief Find queue family of a given physical device
+	*
+	* \param[in] device A physical device
+	* \returns queue family index
+	*
+	*/
+	int vhDevFindQueueFamily(VkPhysicalDevice device, VkQueueFlags queueFlags)
+	{
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		auto it = std::find_if(queueFamilies.begin(), queueFamilies.end(),
+			[queueFlags](auto& queueFamily) { return queueFamily.queueCount > 0 && (queueFamily.queueFlags & queueFlags) == queueFlags; });
+		return it != queueFamilies.end() ? std::distance(queueFamilies.begin(), it) : -1;
+	}
+
 	/**
 		*
 		* \brief Check whether a given physical device offers a list of required extensions
@@ -435,7 +457,7 @@ namespace vh
 		vkGetDeviceQueue(*device, indices.presentFamily, 0, presentQueue);
 		if (withVideo) {
 			vkGetDeviceQueue(*device, indices.videoDecodeFamily, 0, videoDecodeQueue);
-		}		
+		}
 
 		return VK_SUCCESS;
 	}

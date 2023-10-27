@@ -9,7 +9,6 @@
 #include "VEInclude.h"
 #include "irrKlang.h"
 
-
 namespace ve {
 
 
@@ -64,6 +63,7 @@ namespace ve {
 	double g_time = 30.0;				//zeit die noch übrig ist
 	bool g_gameLost = false;			//true... das Spiel wurde verloren
 	bool g_restart = false;			//true...das Spiel soll neu gestartet werden
+	int g_decodeVideo = false;
 
 	//
 	//Zeichne das GUI
@@ -78,7 +78,7 @@ namespace ve {
 			struct nk_context * ctx = pSubrender->getContext();
 
 			if (!g_gameLost) {
-				if (nk_begin(ctx, "", nk_rect(0, 0, 200, 170), NK_WINDOW_BORDER )) {
+				if (nk_begin(ctx, "", nk_rect(0, 0, 200, 200), NK_WINDOW_BORDER )) {
 					char outbuffer[100];
 					nk_layout_row_dynamic(ctx, 45, 1);
 					sprintf(outbuffer, "Score: %03d", g_score);
@@ -90,7 +90,7 @@ namespace ve {
 				}
 			}
 			else {
-				if (nk_begin(ctx, "", nk_rect(500, 500, 200, 170), NK_WINDOW_BORDER )) {
+				if (nk_begin(ctx, "", nk_rect(500, 500, 200, 200), NK_WINDOW_BORDER )) {
 					nk_layout_row_dynamic(ctx, 45, 1);
 					nk_label(ctx, "Game Over", NK_TEXT_LEFT);
 					if (nk_button_label(ctx, "Restart")) {
@@ -99,6 +99,18 @@ namespace ve {
 				}
 
 			};
+
+			static double fps = 0.0;
+			if (event.dt > 0)
+				fps = 0.05 / event.dt + 0.95 * fps;
+			std::stringstream str;
+			str << std::setprecision(5);
+			str << "FPS " << fps;
+			nk_layout_row_dynamic(ctx, 30, 1);
+			nk_label(ctx, str.str().c_str(), NK_TEXT_LEFT);
+
+			nk_layout_row_dynamic(ctx, 45, 1);
+			nk_checkbox_label(ctx, "Decode Video", &g_decodeVideo);
 
 			nk_end(ctx);
 		}
@@ -111,6 +123,65 @@ namespace ve {
 		virtual ~EventListenerGUI() {};
 	};
 
+	class EventListenerVideoDecoder : public VEEventListener {
+	private:
+		vh::VHVideoDecoder videoDecoder;
+		//std::ofstream outfile;
+
+	protected:
+		void onFrameStarted(veEvent event) override
+		{
+			const uint32_t PLAYBACK_FPS = 100;
+			const double TIME_BETWEEN_DECODES = 1.0 / PLAYBACK_FPS;
+			static double timeSinceLastDecode = TIME_BETWEEN_DECODES;
+			timeSinceLastDecode += event.dt;
+
+			VkResult ret;
+			const char* packetData;
+			size_t packetSize;
+			//do {
+			//	ret = videoEncoder.finishEncode(packetData, packetSize);
+			//	if (ret != VK_SUCCESS && ret != VK_NOT_READY) {
+			//		std::cout << "Error on VideoEncoder frame finish\n";
+			//	}
+			//	if (packetSize > 0) {
+			//		if (!outfile.is_open()) {
+			//			outfile.open("hwenc.264", std::ios::binary);
+			//		}
+			//		outfile.write(packetData, packetSize);
+			//	}
+			//} while (packetSize > 0);
+
+			if (!g_decodeVideo || timeSinceLastDecode < TIME_BETWEEN_DECODES)
+				return;
+			timeSinceLastDecode = 0.0;
+
+			// queue another frame for copy
+			VkExtent2D extent = getWindowPointer()->getExtent();
+			ret = videoDecoder.init(getEnginePointer()->getRenderer()->getPhysicalDevice(),
+				getEnginePointer()->getRenderer()->getDevice(),
+				getEnginePointer()->getRenderer()->getVmaAllocator(),
+				getEnginePointer()->getRenderer()->getVideoDecodeQueue(),
+				getEnginePointer()->getRenderer()->getVideoDecodeCommandPool());
+			if (ret != VK_SUCCESS) {
+				std::cout << "Error initializing VideoDecoder\n";
+				g_decodeVideo = false;
+				return;
+			}
+
+			//ret = videoEncoder.queueEncode(getEnginePointer()->getRenderer()->getImageIndex());
+			//if (ret != VK_SUCCESS) {
+			//	std::cout << "Error using VideoEncoder\n";
+			//}
+		}
+
+	public:
+		///Constructor of class EventListenerCollision
+		EventListenerVideoDecoder(std::string name) : VEEventListener(name) { };
+
+		///Destructor of class EventListenerCollision
+		virtual ~EventListenerVideoDecoder() {};
+	};
 
 	static std::default_random_engine e{ 12345 };					//Für Zufallszahlen
 	static std::uniform_real_distribution<> d{ -10.0f, 10.0f };		//Für Zufallszahlen
@@ -125,7 +196,7 @@ namespace ve {
 
 			if (g_restart) {
 				g_gameLost = false;
-				g_restart = false;
+				g_restart = false;				
 				g_time = 30;
 				g_score = 0;
 				getSceneManagerPointer()->getSceneNode("The Cube Parent")->setPosition(glm::vec3(d(e), 1.0f, d(e)));
@@ -174,6 +245,7 @@ namespace ve {
 	void MyVulkanEngine::registerEventListeners() {
 		VEEngine::registerEventListeners();
 		registerEventListener(new EventListenerCollision("Collision"), { veEvent::VE_EVENT_FRAME_STARTED });
+		registerEventListener(new EventListenerVideoDecoder("VideoDecoder"), { veEvent::VE_EVENT_FRAME_STARTED });
 		registerEventListener(new EventListenerGUI("GUI"), { veEvent::VE_EVENT_DRAW_OVERLAY });
 	};
 

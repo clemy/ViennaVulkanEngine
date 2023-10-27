@@ -182,6 +182,8 @@ VK_DEVICE_LEVEL_FUNCTION(vkGetRayTracingShaderGroupHandlesKHR)
 VK_DEVICE_LEVEL_FUNCTION(vkCmdTraceRaysKHR)
 
 // Video Extension Function Binding
+VK_DEVICE_LEVEL_FUNCTION(vkGetPhysicalDeviceVideoCapabilitiesKHR)
+VK_DEVICE_LEVEL_FUNCTION(vkGetPhysicalDeviceVideoFormatPropertiesKHR)
 VK_DEVICE_LEVEL_FUNCTION(vkCreateVideoSessionKHR)
 VK_DEVICE_LEVEL_FUNCTION(vkDestroyVideoSessionKHR)
 VK_DEVICE_LEVEL_FUNCTION(vkGetVideoSessionMemoryRequirementsKHR)
