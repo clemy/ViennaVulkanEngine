@@ -24,7 +24,7 @@ namespace vh {
 	private:
 		VkResult allocateVideoSessionMemory();
 		VkResult createVideoSessionParameters(uint32_t fps);
-
+		VkResult allocateReferenceImages(uint32_t count);
 
 		bool m_initialized{ false };
 
@@ -32,13 +32,26 @@ namespace vh {
 		VmaAllocator m_allocator;
 		VkQueue m_decodeQueue;
 		VkCommandPool m_decodeCommandPool;
+		uint32_t m_width;
+		uint32_t m_height;
+		uint32_t m_decodeQueueFamily;
 
+		VkVideoDecodeH264ProfileInfoKHR m_h264videoProfile;
+		VkVideoProfileInfoKHR m_videoProfile;
+		VkVideoProfileListInfoKHR m_videoProfileList;
 		VkVideoSessionKHR m_videoSession;
 		std::vector<VmaAllocation> m_allocations;
+		StdVideoH264SequenceParameterSetVui m_vui;
+		StdVideoH264SequenceParameterSet m_sps;
+		StdVideoH264PictureParameterSet m_pps;
 		VkVideoSessionParametersKHR m_videoSessionParameters;
 
 		VkCommandBuffer m_decodeCommandBuffer;
-    };
+
+		std::vector<VkImage> m_dpbImages;
+		std::vector <VmaAllocation> m_dpbImageAllocations;
+		std::vector <VkImageView> m_dpbImageViews;
+	};
 };
 
 #endif

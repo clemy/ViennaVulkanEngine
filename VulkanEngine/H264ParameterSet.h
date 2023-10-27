@@ -92,83 +92,35 @@ namespace h264
 
         return pps;
     }
-    /*
-    class FrameInfo {
+
+
+    class DecodeFrameInfo {
     public:
-        FrameInfo(uint32_t frameCount, uint32_t width, uint32_t height, StdVideoH264SequenceParameterSet sps, StdVideoH264PictureParameterSet pps, bool isI)
+        DecodeFrameInfo(uint32_t frameCount, uint32_t width, uint32_t height, StdVideoH264SequenceParameterSet sps, StdVideoH264PictureParameterSet pps, bool isI)
         {
-            const uint32_t MaxPicOrderCntLsb = 1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
-
-            m_sliceHeaderFlags.num_ref_idx_active_override_flag = 0;
-            m_sliceHeaderFlags.no_output_of_prior_pics_flag = 0;
-            m_sliceHeaderFlags.adaptive_ref_pic_marking_mode_flag = 0;
-            m_sliceHeaderFlags.no_prior_references_available_flag = 0;
-
-            m_sliceHeader.flags = m_sliceHeaderFlags;
-            m_sliceHeader.slice_type = isI ? STD_VIDEO_H264_SLICE_TYPE_I : STD_VIDEO_H264_SLICE_TYPE_P;
-            m_sliceHeader.idr_pic_id = 0;
-            m_sliceHeader.num_ref_idx_l0_active_minus1 = 0;
-            m_sliceHeader.num_ref_idx_l1_active_minus1 = 0;
-            m_sliceHeader.cabac_init_idc = (StdVideoH264CabacInitIdc)0;
-            m_sliceHeader.disable_deblocking_filter_idc = (StdVideoH264DisableDeblockingFilterIdc)0;
-            m_sliceHeader.slice_alpha_c0_offset_div2 = 0;
-            m_sliceHeader.slice_beta_offset_div2 = 0;
-
-            uint32_t picWidthInMbs = sps.pic_width_in_mbs_minus1 + 1;
-            uint32_t picHeightInMbs = sps.pic_height_in_map_units_minus1 + 1;
-            uint32_t iPicSizeInMbs = picWidthInMbs * picHeightInMbs;
-
-            m_sliceInfo.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_NALU_SLICE_INFO_EXT;
-            m_sliceInfo.pNext = NULL;
-            m_sliceInfo.pStdSliceHeader = &m_sliceHeader;
-            m_sliceInfo.mbCount = iPicSizeInMbs;
-
-            m_pictureInfoFlags.idr_flag = isI ? 1 : 0; // every I frame is an IDR frame
-            m_pictureInfoFlags.is_reference_flag = 1;
-
-            m_stdPictureInfo.flags = m_pictureInfoFlags;
-            m_stdPictureInfo.seq_parameter_set_id = 0;
-            m_stdPictureInfo.pic_parameter_set_id = pps.pic_parameter_set_id;
-            m_stdPictureInfo.pictureType = isI ? STD_VIDEO_H264_PICTURE_TYPE_I : STD_VIDEO_H264_PICTURE_TYPE_P;
-
-            // frame_num is incremented for each reference frame transmitted.
-            // In our case, only the first frame (which is IDR) is a reference
-            // frame with frame_num == 0, and all others have frame_num == 1.
-            m_stdPictureInfo.frame_num = frameCount;
-
-            // POC is incremented by 2 for each coded frame.
-            m_stdPictureInfo.PicOrderCnt = (frameCount * 2) % MaxPicOrderCntLsb;
-
-            m_encodeH264FrameInfo.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_VCL_FRAME_INFO_EXT;
-            m_encodeH264FrameInfo.pNext = NULL;
-            m_encodeH264FrameInfo.naluSliceEntryCount = 1;
-            m_encodeH264FrameInfo.pNaluSliceEntries = &m_sliceInfo;
-            m_encodeH264FrameInfo.pStdPictureInfo = &m_stdPictureInfo;
-
-            if (!isI) {
-                m_referenceLists.refPicList0EntryCount = 1;
-                m_referenceLists.pRefPicList0Entries = &m_referencePic;
-
-                m_encodeH264FrameInfo.pStdReferenceFinalLists = &m_referenceLists;
-            }
+            m_decodeH264pictureInfo.flags.field_pic_flag = 0;
+            m_decodeH264pictureInfo.flags.is_intra = isI ? 1 : 0;
+            m_decodeH264pictureInfo.flags.IdrPicFlag = 1;
+            m_decodeH264pictureInfo.flags.bottom_field_flag = 0;
+            m_decodeH264pictureInfo.flags.is_reference = 0;
+            m_decodeH264pictureInfo.flags.complementary_field_pair = 0;
+            m_decodeH264pictureInfo.seq_parameter_set_id = sps.seq_parameter_set_id;
+            m_decodeH264pictureInfo.pic_parameter_set_id = pps.pic_parameter_set_id;
+            m_decodeH264pictureInfo.frame_num = 0;
+            m_decodeH264pictureInfo.idr_pic_id = 0;
+            m_decodeH264pictureInfo.PicOrderCnt[0] = 0;
+            m_decodeH264pictureInfo.PicOrderCnt[1] = 1;
         }
 
-        inline VkVideoEncodeH264VclFrameInfoEXT* getEncodeH264FrameInfo()
+        inline StdVideoDecodeH264PictureInfo* getDecodeH264FrameInfo()
         {
-            return &m_encodeH264FrameInfo;
+            return &m_decodeH264pictureInfo;
         };
 
     private:
-        StdVideoEncodeH264SliceHeaderFlags m_sliceHeaderFlags = {};
-        StdVideoEncodeH264SliceHeader m_sliceHeader = {};
-        VkVideoEncodeH264NaluSliceInfoEXT m_sliceInfo = {};
-        StdVideoEncodeH264PictureInfoFlags m_pictureInfoFlags = {};
-        StdVideoEncodeH264PictureInfo m_stdPictureInfo = {};
-        VkVideoEncodeH264VclFrameInfoEXT m_encodeH264FrameInfo = {};
-        StdVideoEncodeH264ReferenceListsInfo m_referenceLists = {};
-        uint8_t m_referencePic = 1;
+        StdVideoDecodeH264PictureInfo m_decodeH264pictureInfo = {};
     };
-    */
+
     class BitStream
     {
     public:

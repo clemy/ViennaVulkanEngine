@@ -9,6 +9,8 @@
 #include "VEInclude.h"
 #include "irrKlang.h"
 
+#include "VHVideoDecoder.h"
+
 namespace ve {
 
 

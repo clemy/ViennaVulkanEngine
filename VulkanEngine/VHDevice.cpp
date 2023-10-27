@@ -166,7 +166,7 @@ namespace vh
 
 		auto it = std::find_if(queueFamilies.begin(), queueFamilies.end(),
 			[queueFlags](auto& queueFamily) { return queueFamily.queueCount > 0 && (queueFamily.queueFlags & queueFlags) == queueFlags; });
-		return it != queueFamilies.end() ? std::distance(queueFamilies.begin(), it) : -1;
+		return it != queueFamilies.end() ? (int)std::distance(queueFamilies.begin(), it) : -1;
 	}
 
 	/**

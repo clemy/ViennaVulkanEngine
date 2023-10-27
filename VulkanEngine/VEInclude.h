@@ -49,8 +49,6 @@
 #include "VESubrenderRayTracingNV_DN.h"
 #include "VESubrenderRayTracingKHR_DN.h"
 
-#include "VHVideoDecoder.h"
-
 //use this macro to check the function result, if its not VK_SUCCESS then return the error
 #define VECHECKRESULT(x) { \
         VkResult retval = (x); \

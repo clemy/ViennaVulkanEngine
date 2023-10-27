@@ -27,13 +27,15 @@ namespace vh
 		VkBufferUsageFlags usage,
 		VmaMemoryUsage vmaUsage,
 		VkBuffer *buffer,
-		VmaAllocation *allocation)
+		VmaAllocation *allocation,
+		void *pNext)
 	{
 		VkBufferCreateInfo bufferInfo = {};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		bufferInfo.size = size;
 		bufferInfo.usage = usage;
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		bufferInfo.pNext = pNext;
 
 		VmaAllocationCreateInfo allocInfo = {};
 		allocInfo.usage = vmaUsage; //VMA_MEMORY_USAGE_GPU_ONLY;
@@ -351,7 +353,7 @@ namespace vh
 	* \returns VK_SUCCESS or a Vulkan error code
 	*
 	*/
-	VkResult vhBufTransitionImageLayout(VkDevice device, VkQueue graphicsQueue, VkCommandPool commandPool, VkImage image, VkFormat format, VkImageAspectFlagBits aspect, uint32_t miplevels, uint32_t layerCount, VkImageLayout oldLayout, VkImageLayout newLayout)
+	VkResult vhBufTransitionImageLayout(VkDevice device, VkQueue graphicsQueue, VkCommandPool commandPool, VkImage image, VkFormat format, VkImageAspectFlags aspect, uint32_t miplevels, uint32_t layerCount, VkImageLayout oldLayout, VkImageLayout newLayout)
 	{
 		VkCommandBuffer commandBuffer = vhCmdBeginSingleTimeCommands(device, commandPool);
 
@@ -378,7 +380,7 @@ namespace vh
 	* \returns VK_SUCCESS or a Vulkan error code
 	*
 	*/
-	VkResult vhBufTransitionImageLayout(VkDevice device, VkQueue graphicsQueue, VkCommandBuffer commandBuffer, VkImage image, VkFormat format, VkImageAspectFlagBits aspect, uint32_t miplevels, uint32_t layerCount, VkImageLayout oldLayout, VkImageLayout newLayout)
+	VkResult vhBufTransitionImageLayout(VkDevice device, VkQueue graphicsQueue, VkCommandBuffer commandBuffer, VkImage image, VkFormat format, VkImageAspectFlags aspect, uint32_t miplevels, uint32_t layerCount, VkImageLayout oldLayout, VkImageLayout newLayout)
 	{
 		VkImageMemoryBarrier barrier = {};
 		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
