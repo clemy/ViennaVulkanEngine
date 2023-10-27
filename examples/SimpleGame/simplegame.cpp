@@ -41,13 +41,15 @@ namespace ve {
 				{ "bluecloud_ft.jpg", "bluecloud_bk.jpg", "bluecloud_up.jpg",
 					"bluecloud_dn.jpg", "bluecloud_rt.jpg", "bluecloud_lf.jpg" }, pScene));
 
-			VESceneNode* e4;
-			VECHECKPOINTER(e4 = getSceneManagerPointer()->loadModel("The Plane", "../../media/models/test/plane", "plane_t_n_s.obj", 0, pScene));
-			e4->setTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f, 1.0f, 1000.0f)));
+			//getSceneManagerPointer()->createTextureYcbcr("../../media/models/test/plane/plane_t_n_s.obj/grass.jpg");
 
-			VEEntity* pE4;
-			VECHECKPOINTER(pE4 = (VEEntity*)getSceneManagerPointer()->getSceneNode("The Plane/plane_t_n_s.obj/plane/Entity_0"));
-			pE4->setParam(glm::vec4(1000.0f, 1000.0f, 0.0f, 0.0f));
+			//VESceneNode* e4;
+			//VECHECKPOINTER(e4 = getSceneManagerPointer()->loadModel("The Plane", "../../media/models/test/plane", "plane_t_n_s.obj", 0, pScene));
+			//e4->setTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f, 1.0f, 1000.0f)));
+
+			//VEEntity* pE4;
+			//VECHECKPOINTER(pE4 = (VEEntity*)getSceneManagerPointer()->getSceneNode("The Plane/plane_t_n_s.obj/plane/Entity_0"));
+			//pE4->setParam(glm::vec4(1000.0f, 1000.0f, 0.0f, 0.0f));
 
 			VESceneNode* e1, * eParent;
 			eParent = getSceneManagerPointer()->createSceneNode("The Cube Parent", pScene, glm::mat4(1.0));
@@ -170,6 +172,45 @@ namespace ve {
 				g_decodeVideo = false;
 				return;
 			}
+
+			g_decodeVideo = false;
+
+			VETexture* pTex = getSceneManagerPointer()->createTextureYcbcr("../../media/models/test/plane/plane_t_n_s.obj/grass.jpg");
+			pTex->m_image = videoDecoder.m_dpbImages[0];
+			pTex->m_format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+			pTex->m_imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			pTex->m_imageInfo.imageView = videoDecoder.m_dpbImageViews[0];
+
+			//VkSamplerCreateInfo samplerInfo = {};
+			//samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			//samplerInfo.magFilter = VK_FILTER_LINEAR;
+			//samplerInfo.minFilter = VK_FILTER_LINEAR;
+			//samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			//samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			//samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			//samplerInfo.anisotropyEnable = VK_FALSE;
+			//samplerInfo.maxAnisotropy = 16;
+			//samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+			//samplerInfo.unnormalizedCoordinates = VK_FALSE;
+			//samplerInfo.compareEnable = VK_FALSE;
+			//samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+			//samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			//samplerInfo.pNext = &g_yCbCrConversionInfo;
+
+			//VECHECKRESULT(vkCreateSampler(getEnginePointer()->getRenderer()->getDevice(), &samplerInfo, nullptr, &pTex->m_imageInfo.sampler));
+
+			VESceneNode* pScene;
+			VECHECKPOINTER(pScene = getSceneManagerPointer()->getSceneNode("Level 1"));
+			VESceneNode* e4;
+			VECHECKPOINTER(e4 = getSceneManagerPointer()->loadModel("The Plane", "../../media/models/test/plane", "plane_t_n_s.obj", 0, pScene));
+			//e4->setTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f, 1.0f, 1000.0f)));
+			e4->setTransform(glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 1.0f, 10.0f)), glm::vec3(0.0f, 0.0f, 0.9f)));
+
+			VEEntity* pE4;
+			VECHECKPOINTER(pE4 = (VEEntity*)getSceneManagerPointer()->getSceneNode("The Plane/plane_t_n_s.obj/plane/Entity_0"));
+			//pE4->setParam(glm::vec4(1000.0f, 1000.0f, 0.0f, 0.0f));
+
+			//getSceneManagerPointer()->getMaterial();
 
 			//ret = videoEncoder.queueEncode(getEnginePointer()->getRenderer()->getImageIndex());
 			//if (ret != VK_SUCCESS) {

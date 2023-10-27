@@ -185,6 +185,8 @@ namespace ve
 
 		VETexture *createTexture(std::string name, std::string basedir, std::string texName);
 
+		VETexture *createTextureYcbcr(std::string name);
+
 		VETexture *getTexture(std::string name);
 
 		void deleteTexture(std::string name);

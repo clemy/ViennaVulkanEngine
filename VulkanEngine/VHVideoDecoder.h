@@ -28,6 +28,7 @@ namespace vh {
 
 		bool m_initialized{ false };
 
+	public: // TODO: remove
 		VkDevice m_device;
 		VmaAllocator m_allocator;
 		VkQueue m_decodeQueue;
@@ -48,6 +49,7 @@ namespace vh {
 
 		VkCommandBuffer m_decodeCommandBuffer;
 
+		VkSamplerYcbcrConversionInfo m_yCbCrConversionInfo;
 		std::vector<VkImage> m_dpbImages;
 		std::vector <VmaAllocation> m_dpbImageAllocations;
 		std::vector <VkImageView> m_dpbImageViews;

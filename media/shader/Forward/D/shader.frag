@@ -29,7 +29,7 @@ layout(set = 3, binding = 0) uniform objectUBO_t {
     objectData_t data;
 } objectUBO;
 
-layout(set = 4, binding = 0) uniform sampler2D texSamplerArray[RESOURCEARRAYLENGTH];
+layout(set = 4, binding = 0) uniform sampler2D uSamplerLinearYUV420P;
 
 
 void main() {
@@ -50,7 +50,7 @@ void main() {
     vec3 ambcol  = lightUBO.data.col_ambient.xyz;
     vec3 diffcol = lightUBO.data.col_diffuse.xyz;
     vec3 speccol = lightUBO.data.col_specular.xyz;
-    vec3 fragColor = texture(texSamplerArray[resIdx], texCoord).xyz;
+    vec3 fragColor = texture(uSamplerLinearYUV420P, texCoord).xyz;
 
     vec3 result = vec3(0, 0, 0);
     int sIdx = 0;

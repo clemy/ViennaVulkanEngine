@@ -81,7 +81,7 @@ namespace vh
 	* \returns VK_SUCCESS or a Vulkan error code
 	*
 	*/
-	VkResult vhBufCreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageViewType viewtype, uint32_t layerCount, VkImageAspectFlags aspectFlags, VkImageView *imageView)
+	VkResult vhBufCreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageViewType viewtype, uint32_t layerCount, VkImageAspectFlags aspectFlags, VkImageView *imageView, void *pNext)
 	{
 		VkImageViewCreateInfo viewInfo = {};
 		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -93,6 +93,7 @@ namespace vh
 		viewInfo.subresourceRange.levelCount = 1;
 		viewInfo.subresourceRange.baseArrayLayer = 0;
 		viewInfo.subresourceRange.layerCount = layerCount;
+		viewInfo.pNext = pNext;
 
 		return vkCreateImageView(device, &viewInfo, nullptr, imageView);
 	}
@@ -715,7 +716,7 @@ namespace vh
 	* \returns VK_SUCCESS or a Vulkan error code
 	*
 	*/
-	VkResult vhBufCreateTextureSampler(VkDevice device, VkSampler *textureSampler)
+	VkResult vhBufCreateTextureSampler(VkDevice device, VkSampler *textureSampler, void* pNext)
 	{
 		VkSamplerCreateInfo samplerInfo = {};
 		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -731,6 +732,7 @@ namespace vh
 		samplerInfo.compareEnable = VK_FALSE;
 		samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 		samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		samplerInfo.pNext = pNext;
 
 		return vkCreateSampler(device, &samplerInfo, nullptr, textureSampler);
 	}

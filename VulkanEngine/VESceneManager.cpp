@@ -1157,6 +1157,17 @@ namespace ve
 		return pTex;
 	}
 
+	VETexture* VESceneManager::createTextureYcbcr(std::string name)
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+		if (m_textures.count(name) > 0)
+			return m_textures[name]; //if the texture already exists, return it
+
+		VETexture* pTex = new VETexture(name);
+		m_textures[name] = pTex;
+		return pTex;
+	}
+
 	/**
 	*
 	* \brief Get a texture with a given name

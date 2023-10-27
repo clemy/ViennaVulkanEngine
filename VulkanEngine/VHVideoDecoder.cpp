@@ -1,6 +1,8 @@
 #include "VHVideoDecoder.h"
 #include "H264ParameterSet.h"
 
+extern VkSamplerYcbcrConversionInfo g_yCbCrConversionInfo;
+
 namespace vh {
     VkResult VHVideoDecoder::init(
         VkPhysicalDevice physicalDevice,
@@ -71,7 +73,7 @@ namespace vh {
 
         VkPhysicalDeviceVideoFormatInfoKHR videoFormatInfo = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_FORMAT_INFO_KHR };
         videoFormatInfo.pNext = &m_videoProfileList;
-        videoFormatInfo.imageUsage = VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        videoFormatInfo.imageUsage = VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
         uint32_t count = 0;
         VHCHECKRESULT(vkGetPhysicalDeviceVideoFormatPropertiesKHR(physicalDevice, &videoFormatInfo, &count, nullptr));
@@ -204,6 +206,11 @@ namespace vh {
         VkVideoEndCodingInfoKHR encodeEndInfo = { VK_STRUCTURE_TYPE_VIDEO_END_CODING_INFO_KHR };
         vkCmdEndVideoCodingKHR(m_decodeCommandBuffer, &encodeEndInfo);
 
+        VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_decodeQueue, m_decodeCommandBuffer,
+            m_dpbImages[0], VK_FORMAT_R8G8_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
+            VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+
+
         VHCHECKRESULT(vkEndCommandBuffer(m_decodeCommandBuffer));
         VHCHECKRESULT(vhCmdSubmitCommandBuffer(m_device, m_decodeQueue, m_decodeCommandBuffer, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE));
 
@@ -212,7 +219,7 @@ namespace vh {
 
         uint8_t* dataImage = new uint8_t[m_width * m_height];
         VkResult ret = vhBufCopyImageToHost(m_device, m_allocator, m_decodeQueue, m_decodeCommandPool,
-            m_dpbImages[0], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR,
+            m_dpbImages[0], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             dataImage, m_width, m_height, m_width * m_height);
 
         VHCHECKRESULT(ret);
@@ -292,6 +299,12 @@ namespace vh {
 
     VkResult VHVideoDecoder::allocateReferenceImages(uint32_t count)
     {
+        //VkSamplerYcbcrConversionCreateInfo yCbCrConversionCreateInfo = { VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO };
+        //yCbCrConversionCreateInfo.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+
+        //m_yCbCrConversionInfo = { VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO };
+        //VHCHECKRESULT(vkCreateSamplerYcbcrConversionKHR(m_device, &yCbCrConversionCreateInfo, nullptr, &m_yCbCrConversionInfo.conversion));
+
         m_dpbImages.resize(count);
         m_dpbImageAllocations.resize(count);
         m_dpbImageViews.resize(count);
@@ -306,7 +319,7 @@ namespace vh {
             tmpImgCreateInfo.arrayLayers = 1;
             tmpImgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             tmpImgCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            tmpImgCreateInfo.usage = VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            tmpImgCreateInfo.usage = VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
             tmpImgCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE here makes it not check for queueFamily
             tmpImgCreateInfo.queueFamilyIndexCount = 1;
             tmpImgCreateInfo.pQueueFamilyIndices = &m_decodeQueueFamily;
@@ -315,7 +328,7 @@ namespace vh {
             VmaAllocationCreateInfo allocInfo = {};
             allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
             VHCHECKRESULT(vmaCreateImage(m_allocator, &tmpImgCreateInfo, &allocInfo, &m_dpbImages[i], &m_dpbImageAllocations[i], nullptr));
-            VHCHECKRESULT(vhBufCreateImageView(m_device, m_dpbImages[i], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_VIEW_TYPE_2D, 1, VK_IMAGE_ASPECT_COLOR_BIT, &m_dpbImageViews[i]));
+            VHCHECKRESULT(vhBufCreateImageView(m_device, m_dpbImages[i], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_VIEW_TYPE_2D, 1, VK_IMAGE_ASPECT_COLOR_BIT, &m_dpbImageViews[i], &g_yCbCrConversionInfo));
         }
         return VK_SUCCESS;
     }
