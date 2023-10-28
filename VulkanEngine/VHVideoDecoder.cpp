@@ -228,8 +228,8 @@ namespace vh {
 
         //VHCHECKRESULT(ret);
 
-        //vmaUnmapMemory(m_allocator, m_bitStreamBufferAllocation);
-        //vmaDestroyBuffer(m_allocator, m_bitStreamBuffer, m_bitStreamBufferAllocation);
+        vmaUnmapMemory(m_allocator, m_bitStreamBufferAllocation);
+        vmaDestroyBuffer(m_allocator, m_bitStreamBuffer, m_bitStreamBufferAllocation);
 
         //std::string name("../../out.png");
         //stbi_write_png(name.c_str(), m_width, m_height, 1, dataImage, 1 * m_width);
