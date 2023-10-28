@@ -49,13 +49,12 @@ namespace ve
 		vkCreateSampler(m_renderer.getDevice(), &samplerInfo, nullptr, &m_sampler);
 		std::vector sampler(m_resourceArrayLength, m_sampler);
 
-		vh::vhRenderCreateDescriptorSetLayout(m_renderer.getDevice(), //binding 0...array, binding 1...array
-			{ m_resourceArrayLength, m_resourceArrayLength },
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER },
-			{ VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT },
+		vh::vhRenderCreateDescriptorSetLayout(m_renderer.getDevice(),
+			{ m_resourceArrayLength },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER },
+			{ VK_SHADER_STAGE_FRAGMENT_BIT },
 			&m_descriptorSetLayoutResources,
-			{ sampler.data(), nullptr });
+			{ sampler.data() });
 
 		VkDescriptorSetLayout perObjectLayout = m_renderer.getDescriptorSetLayoutPerObject();
 
@@ -74,7 +73,7 @@ namespace ve
 			&m_pipelines[0]);
 
 		if (m_maps.empty())
-			m_maps.resize(2);
+			m_maps.resize(1);
 	}
 
 	void VESubrenderFW_Video::closeSubrenderer()
@@ -136,10 +135,10 @@ namespace ve
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		std::vector<VkDescriptorImageInfo> maps = {
-			imageInfo,
-			//pEntity->m_pMaterial->mapDiffuse->m_imageInfo,
-			//pEntity->m_pMaterial->mapNormal->m_imageInfo, // prevent crash until video shader is ready
-			pEntity->m_pMaterial->mapNormal->m_imageInfo };
+			imageInfo
+			//pEntity->m_pMaterial->mapDiffuse->m_imageInfo
+			//pEntity->m_pMaterial->mapNormal->m_imageInfo // prevent crash until video shader is ready
+		};
 
 		addMaps(pEntity, maps);
 

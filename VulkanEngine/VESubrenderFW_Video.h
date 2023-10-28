@@ -14,7 +14,7 @@
 namespace ve
 {
 	/**
-		* \brief Subrenderer that manages entities that have a diffuse texture and a normal map
+		* \brief Subrenderer that manages entities that have a video texture
 		*/
 	class VESubrenderFW_Video : public VESubrenderFW
 	{
@@ -24,27 +24,27 @@ namespace ve
 			: VESubrenderFW(renderer) {};
 
 		///Destructor for class VESubrenderFW_DN
-		virtual ~VESubrenderFW_Video() {};
+		virtual ~VESubrenderFW_Video() override {};
 
 		///\returns the class of the subrenderer
-		virtual veSubrenderClass getClass()
+		virtual veSubrenderClass getClass() override
 		{
 			return VE_SUBRENDERER_CLASS_OBJECT;
 		};
 
 		///\returns the type of the subrenderer
-		virtual veSubrenderType getType()
+		virtual veSubrenderType getType() override
 		{
 			return VE_SUBRENDERER_TYPE_VIDEO;
 		};
 
-		virtual void initSubrenderer();
+		virtual void initSubrenderer() override;
 
-		virtual void closeSubrenderer();
+		virtual void closeSubrenderer() override;
 
-		virtual void setDynamicPipelineState(VkCommandBuffer commandBuffer, uint32_t numPass);
+		virtual void setDynamicPipelineState(VkCommandBuffer commandBuffer, uint32_t numPass) override;
 
-		virtual void addEntity(VEEntity* pEntity);
+		virtual void addEntity(VEEntity* pEntity) override;
 
 	private:
 		VkSamplerYcbcrConversionInfo m_yCbCrConversionInfo{ VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO };
