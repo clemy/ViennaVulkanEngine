@@ -122,6 +122,11 @@ namespace ve
 			{
 				if (pEntity->m_pMaterial->mapNormal != nullptr)
 				{
+					if (pEntity->m_pMaterial->mapDiffuse->m_format == VK_FORMAT_G8_B8R8_2PLANE_420_UNORM)
+					{
+						type = VE_SUBRENDERER_TYPE_VIDEO;
+						break;
+					}
 					type = VE_SUBRENDERER_TYPE_DIFFUSEMAP_NORMALMAP;
 					break;
 				}

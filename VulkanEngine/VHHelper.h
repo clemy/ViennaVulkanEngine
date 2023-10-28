@@ -258,8 +258,6 @@ namespace vh
 
 	QueueFamilyIndices vhDevFindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, bool withVideo = false);
 	
-	int vhDevFindQueueFamily(VkPhysicalDevice device, VkQueueFlags queueFlags);
-
 	VkFormat vhDevFindSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
 	VkFormat vhDevFindDepthFormat(VkPhysicalDevice physicalDevice);
@@ -296,7 +294,7 @@ namespace vh
 	VkResult vhBufCopyBuffer(VkDevice device, VkQueue graphicsQueue, VkCommandPool commandPool, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
 	VkResult
-		vhBufCreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageViewType viewtype, uint32_t layerCount, VkImageAspectFlags aspectFlags, VkImageView *imageView);
+		vhBufCreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageViewType viewtype, uint32_t layerCount, VkImageAspectFlags aspectFlags, VkImageView *imageView, const void *pNext = nullptr);
 
 	VkResult vhBufCreateDepthResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D swapChainExtent, VkFormat depthFormat, VkImage *depthImage, VmaAllocation *depthImageAllocation, VkImageView *depthImageView);
 
@@ -376,7 +374,7 @@ namespace vh
 
 	VkResult vhRenderCreateRenderPassShadow(VkDevice device, VkFormat depthFormat, VkRenderPass *renderPass);
 
-	VkResult vhRenderCreateDescriptorSetLayout(VkDevice device, std::vector<uint32_t> counts, std::vector<VkDescriptorType> types, std::vector<VkShaderStageFlags> stageFlags, VkDescriptorSetLayout *descriptorSetLayout);
+	VkResult vhRenderCreateDescriptorSetLayout(VkDevice device, std::vector<uint32_t> counts, std::vector<VkDescriptorType> types, std::vector<VkShaderStageFlags> stageFlags, VkDescriptorSetLayout* descriptorSetLayout, std::vector<VkSampler*> pImmutableSamplers = {});
 
 	VkResult vhRenderCreateDescriptorPool(VkDevice device, std::vector<VkDescriptorType> types, std::vector<uint32_t> numberDesc, VkDescriptorPool *descriptorPool);
 

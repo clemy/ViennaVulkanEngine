@@ -11,6 +11,7 @@
 #include "VEEnums.h"
 
 #include "VHHelper.h"
+#include "VHVideoDecoder.h"
 
 #include "VENamedClass.h"
 #include "VEEventListener.h"
@@ -40,6 +41,7 @@
 #include "VESubrenderFW_D.h"
 #include "VESubrenderFW_DN.h"
 #include "VESubrenderFW_Shadow.h"
+#include "VESubrenderFW_Video.h"
 #include "VESubrenderDF_C1.h"
 #include "VESubrenderDF_D.h"
 #include "VESubrenderDF_DN.h"

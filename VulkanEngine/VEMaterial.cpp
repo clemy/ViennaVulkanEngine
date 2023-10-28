@@ -187,6 +187,13 @@ namespace ve
 		if (texNames.size() == 0)
 			return;
 
+		if (texNames.size() == 1 && texNames[0].ends_with(".h264"))
+		{
+			// Video texture
+			m_format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+			return;
+		}
+
 		VECHECKRESULT(vh::vhBufCreateTextureImage(getEnginePointer()->getRenderer()->getDevice(),
 			getEnginePointer()->getRenderer()->getVmaAllocator(),
 			getEnginePointer()->getRenderer()->getGraphicsQueue(),

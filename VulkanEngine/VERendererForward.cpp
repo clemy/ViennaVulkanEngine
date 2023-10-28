@@ -37,7 +37,8 @@ namespace ve
 			VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
 			VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,
 			VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME,
-			VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME
+			VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME,
+			VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME
 		};
 
 		const std::vector<const char *> requiredValidationLayers = {
@@ -52,9 +53,13 @@ namespace ve
 		{
 			m_videoDecodeAvailable = true;
 
+			VkPhysicalDeviceVulkan11Features vulkan11Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES };
+			vulkan11Features.pNext = &enabledBufferDeviceAddresFeatures;
+			vulkan11Features.samplerYcbcrConversion = VK_TRUE;
+
 			if (vh::vhDevCreateLogicalDevice(getEnginePointer()->getInstance(), m_physicalDevice, m_surface,
 				requiredDeviceExtensionsWithVideo, requiredValidationLayers,
-				&enabledBufferDeviceAddresFeatures, &m_device,
+				&vulkan11Features, &m_device,
 				&m_graphicsQueue, &m_presentQueue, &m_videoDecodeQueue) != VK_SUCCESS)
 			{
 				assert(false);
@@ -261,6 +266,9 @@ namespace ve
 
 		//---------------------------------Cloth-Simulation-Stuff-----------------------------------
 		addSubrenderer(new VESubrenderFW_Cloth(*this));
+#
+		if (m_videoDecodeAvailable)
+			addSubrenderer(new VESubrenderFW_Video(*this));
 	}
 
 	/**

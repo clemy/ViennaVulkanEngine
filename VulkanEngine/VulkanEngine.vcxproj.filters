@@ -169,6 +169,12 @@
     <ClCompile Include="VHVideoDecoder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VESubrenderFW_Video.h">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VESubrenderFW_Video.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\BottomLevelASGenerator.h">

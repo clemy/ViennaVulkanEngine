@@ -9,8 +9,6 @@
 #include "VEInclude.h"
 #include "irrKlang.h"
 
-#include "VHVideoDecoder.h"
-
 namespace ve {
 
 
@@ -55,6 +53,15 @@ namespace ve {
 			eParent->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(-10.0f, 0.5f, 10.0f)));
 			eParent->addChild(e1);
 
+			VESceneNode* eV, * eParentVideo;
+			eParentVideo = getSceneManagerPointer()->createSceneNode("The VideoCube Parent", pScene, glm::mat4(1.0));
+			VECHECKPOINTER(eV = getSceneManagerPointer()->loadModel("The VideoCubeVideo", "../../media/models/video/crateVideo", "cube.obj"));
+			eParentVideo->multiplyTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1.6f, 1.2f, 1.6f)));
+			eParentVideo->multiplyTransform(glm::rotate(glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)));
+			eParentVideo->multiplyTransform(glm::rotate(-0.5f, glm::vec3(0.0f, 1.0f, 0.0f)));
+			eParentVideo->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.6f, 5.0f)));
+			eParentVideo->addChild(eV);
+
 			m_irrklangEngine->play2D("../../media/sounds/ophelia.wav", true);
 		};
 	};
@@ -65,7 +72,6 @@ namespace ve {
 	double g_time = 30.0;				//zeit die noch übrig ist
 	bool g_gameLost = false;			//true... das Spiel wurde verloren
 	bool g_restart = false;			//true...das Spiel soll neu gestartet werden
-	int g_decodeVideo = false;
 
 	//
 	//Zeichne das GUI
@@ -111,9 +117,6 @@ namespace ve {
 			nk_layout_row_dynamic(ctx, 30, 1);
 			nk_label(ctx, str.str().c_str(), NK_TEXT_LEFT);
 
-			nk_layout_row_dynamic(ctx, 45, 1);
-			nk_checkbox_label(ctx, "Decode Video", &g_decodeVideo);
-
 			nk_end(ctx);
 		}
 
@@ -123,66 +126,6 @@ namespace ve {
 
 		///Destructor of class EventListenerGUI
 		virtual ~EventListenerGUI() {};
-	};
-
-	class EventListenerVideoDecoder : public VEEventListener {
-	private:
-		vh::VHVideoDecoder videoDecoder;
-		//std::ofstream outfile;
-
-	protected:
-		void onFrameStarted(veEvent event) override
-		{
-			const uint32_t PLAYBACK_FPS = 100;
-			const double TIME_BETWEEN_DECODES = 1.0 / PLAYBACK_FPS;
-			static double timeSinceLastDecode = TIME_BETWEEN_DECODES;
-			timeSinceLastDecode += event.dt;
-
-			VkResult ret;
-			const char* packetData;
-			size_t packetSize;
-			//do {
-			//	ret = videoEncoder.finishEncode(packetData, packetSize);
-			//	if (ret != VK_SUCCESS && ret != VK_NOT_READY) {
-			//		std::cout << "Error on VideoEncoder frame finish\n";
-			//	}
-			//	if (packetSize > 0) {
-			//		if (!outfile.is_open()) {
-			//			outfile.open("hwenc.264", std::ios::binary);
-			//		}
-			//		outfile.write(packetData, packetSize);
-			//	}
-			//} while (packetSize > 0);
-
-			if (!g_decodeVideo || timeSinceLastDecode < TIME_BETWEEN_DECODES)
-				return;
-			timeSinceLastDecode = 0.0;
-
-			// queue another frame for copy
-			VkExtent2D extent = getWindowPointer()->getExtent();
-			ret = videoDecoder.init(getEnginePointer()->getRenderer()->getPhysicalDevice(),
-				getEnginePointer()->getRenderer()->getDevice(),
-				getEnginePointer()->getRenderer()->getVmaAllocator(),
-				getEnginePointer()->getRenderer()->getVideoDecodeQueue(),
-				getEnginePointer()->getRenderer()->getVideoDecodeCommandPool());
-			if (ret != VK_SUCCESS) {
-				std::cout << "Error initializing VideoDecoder\n";
-				g_decodeVideo = false;
-				return;
-			}
-
-			//ret = videoEncoder.queueEncode(getEnginePointer()->getRenderer()->getImageIndex());
-			//if (ret != VK_SUCCESS) {
-			//	std::cout << "Error using VideoEncoder\n";
-			//}
-		}
-
-	public:
-		///Constructor of class EventListenerCollision
-		EventListenerVideoDecoder(std::string name) : VEEventListener(name) { };
-
-		///Destructor of class EventListenerCollision
-		virtual ~EventListenerVideoDecoder() {};
 	};
 
 	static std::default_random_engine e{ 12345 };					//Für Zufallszahlen
@@ -247,7 +190,6 @@ namespace ve {
 	void MyVulkanEngine::registerEventListeners() {
 		VEEngine::registerEventListeners();
 		registerEventListener(new EventListenerCollision("Collision"), { veEvent::VE_EVENT_FRAME_STARTED });
-		registerEventListener(new EventListenerVideoDecoder("VideoDecoder"), { veEvent::VE_EVENT_FRAME_STARTED });
 		registerEventListener(new EventListenerGUI("GUI"), { veEvent::VE_EVENT_DRAW_OVERLAY });
 	};
 

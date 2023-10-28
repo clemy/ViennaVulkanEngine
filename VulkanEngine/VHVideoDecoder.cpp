@@ -1,3 +1,10 @@
+/**
+* Vulkan Video Decoder
+*
+* (c) Bernhard Clemens Schrenk, University of Vienna
+*
+*/
+
 #include "VHVideoDecoder.h"
 #include "H264ParameterSet.h"
 
@@ -6,8 +13,11 @@ namespace vh {
         VkPhysicalDevice physicalDevice,
         VkDevice device,
         VmaAllocator allocator,
+        uint32_t graphicsQueueFamily,
         VkQueue decodeQueue,
-        VkCommandPool decodeCommandPool)
+        uint32_t decodeQueueFamily,
+        VkCommandPool decodeCommandPool,
+        const VkSamplerYcbcrConversionInfo* pYCbCrConversionInfo)
     {
         //assert(!m_running);
 
@@ -29,17 +39,13 @@ namespace vh {
 
         m_device = device;
         m_allocator = allocator;
+        m_graphicsQueueFamily = graphicsQueueFamily;
         m_decodeQueue = decodeQueue;
+        m_decodeQueueFamily = decodeQueueFamily;
         m_decodeCommandPool = decodeCommandPool;
+        m_pYCbCrConversionInfo = pYCbCrConversionInfo;
         m_width = 800;
         m_height = 600;
-        
-        int decodeQueueFamily = vh::vhDevFindQueueFamily(physicalDevice, VK_QUEUE_VIDEO_DECODE_BIT_KHR);
-        if (m_decodeQueueFamily == -1) {
-            std::cout << "Vulkan VideoDecode extension not present.\n";
-            return VK_ERROR_EXTENSION_NOT_PRESENT;
-        }
-        m_decodeQueueFamily = decodeQueueFamily;
 
         m_h264videoProfile = { VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_PROFILE_INFO_KHR };
         m_h264videoProfile.stdProfileIdc = STD_VIDEO_H264_PROFILE_IDC_HIGH;
@@ -71,7 +77,7 @@ namespace vh {
 
         VkPhysicalDeviceVideoFormatInfoKHR videoFormatInfo = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_FORMAT_INFO_KHR };
         videoFormatInfo.pNext = &m_videoProfileList;
-        videoFormatInfo.imageUsage = VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        videoFormatInfo.imageUsage = VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_SAMPLED_BIT;
 
         uint32_t count = 0;
         VHCHECKRESULT(vkGetPhysicalDeviceVideoFormatPropertiesKHR(physicalDevice, &videoFormatInfo, &count, nullptr));
@@ -204,25 +210,30 @@ namespace vh {
         VkVideoEndCodingInfoKHR encodeEndInfo = { VK_STRUCTURE_TYPE_VIDEO_END_CODING_INFO_KHR };
         vkCmdEndVideoCodingKHR(m_decodeCommandBuffer, &encodeEndInfo);
 
+        VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_decodeQueue, m_decodeCommandBuffer,
+            m_dpbImages[0], VK_FORMAT_R8G8_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
+            VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+
+
         VHCHECKRESULT(vkEndCommandBuffer(m_decodeCommandBuffer));
         VHCHECKRESULT(vhCmdSubmitCommandBuffer(m_device, m_decodeQueue, m_decodeCommandBuffer, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE));
 
 
         VHCHECKRESULT(vkQueueWaitIdle(m_decodeQueue)); // TODO: replace with better synchronization!
 
-        uint8_t* dataImage = new uint8_t[m_width * m_height];
-        VkResult ret = vhBufCopyImageToHost(m_device, m_allocator, m_decodeQueue, m_decodeCommandPool,
-            m_dpbImages[0], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR,
-            dataImage, m_width, m_height, m_width * m_height);
+        //uint8_t* dataImage = new uint8_t[m_width * m_height];
+        //VkResult ret = vhBufCopyImageToHost(m_device, m_allocator, m_decodeQueue, m_decodeCommandPool,
+        //    m_dpbImages[0], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR,
+        //    dataImage, m_width, m_height, m_width * m_height);
 
-        VHCHECKRESULT(ret);
+        //VHCHECKRESULT(ret);
 
-        vmaUnmapMemory(m_allocator, m_bitStreamBufferAllocation);
-        vmaDestroyBuffer(m_allocator, m_bitStreamBuffer, m_bitStreamBufferAllocation);
+        //vmaUnmapMemory(m_allocator, m_bitStreamBufferAllocation);
+        //vmaDestroyBuffer(m_allocator, m_bitStreamBuffer, m_bitStreamBufferAllocation);
 
-        std::string name("../../out.png");
-        stbi_write_png(name.c_str(), m_width, m_height, 1, dataImage, 1 * m_width);
-        delete[] dataImage;
+        //std::string name("../../out.png");
+        //stbi_write_png(name.c_str(), m_width, m_height, 1, dataImage, 1 * m_width);
+        //delete[] dataImage;
 
         m_initialized = true;
         return VK_SUCCESS;
@@ -292,6 +303,8 @@ namespace vh {
 
     VkResult VHVideoDecoder::allocateReferenceImages(uint32_t count)
     {
+        uint32_t queueFamilies[] = { m_graphicsQueueFamily, m_decodeQueueFamily };
+
         m_dpbImages.resize(count);
         m_dpbImageAllocations.resize(count);
         m_dpbImageViews.resize(count);
@@ -306,16 +319,16 @@ namespace vh {
             tmpImgCreateInfo.arrayLayers = 1;
             tmpImgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             tmpImgCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            tmpImgCreateInfo.usage = VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-            tmpImgCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE here makes it not check for queueFamily
-            tmpImgCreateInfo.queueFamilyIndexCount = 1;
-            tmpImgCreateInfo.pQueueFamilyIndices = &m_decodeQueueFamily;
+            tmpImgCreateInfo.usage = VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_SAMPLED_BIT;
+            tmpImgCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT; // VK_SHARING_MODE_EXCLUSIVE here makes it not check for queueFamily
+            tmpImgCreateInfo.queueFamilyIndexCount = 2;
+            tmpImgCreateInfo.pQueueFamilyIndices = queueFamilies;
             tmpImgCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             tmpImgCreateInfo.flags = 0;
             VmaAllocationCreateInfo allocInfo = {};
             allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
             VHCHECKRESULT(vmaCreateImage(m_allocator, &tmpImgCreateInfo, &allocInfo, &m_dpbImages[i], &m_dpbImageAllocations[i], nullptr));
-            VHCHECKRESULT(vhBufCreateImageView(m_device, m_dpbImages[i], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_VIEW_TYPE_2D, 1, VK_IMAGE_ASPECT_COLOR_BIT, &m_dpbImageViews[i]));
+            VHCHECKRESULT(vhBufCreateImageView(m_device, m_dpbImages[i], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_VIEW_TYPE_2D, 1, VK_IMAGE_ASPECT_COLOR_BIT, &m_dpbImageViews[i], m_pYCbCrConversionInfo));
         }
         return VK_SUCCESS;
     }

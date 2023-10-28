@@ -363,7 +363,8 @@ namespace vh
 		std::vector<uint32_t> counts,
 		std::vector<VkDescriptorType> types,
 		std::vector<VkShaderStageFlags> stageFlags,
-		VkDescriptorSetLayout *descriptorSetLayout)
+		VkDescriptorSetLayout *descriptorSetLayout,
+		std::vector<VkSampler*> pImmutableSamplers)
 	{
 		std::vector<VkDescriptorSetLayoutBinding> bindings;
 		bindings.resize(types.size());
@@ -373,7 +374,7 @@ namespace vh
 			bindings[i].binding = i;
 			bindings[i].descriptorCount = counts[i];
 			bindings[i].descriptorType = types[i];
-			bindings[i].pImmutableSamplers = nullptr;
+			bindings[i].pImmutableSamplers = pImmutableSamplers.size() > i ? pImmutableSamplers[i] : nullptr;
 			bindings[i].stageFlags = stageFlags[i];
 		}
 
