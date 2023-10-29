@@ -16,10 +16,10 @@ namespace vh {
 		class Session {
 		public:
 			uint32_t getWidth() const {
-				return m_decoder->m_width;
+				return m_width;
 			}
 			uint32_t getHeight() const {
-				return m_decoder->m_height;
+				return m_height;
 			}
 
 			VkResult assignTransferTarget(VkImage targetImage, VkImageView targetImageView);
@@ -36,9 +36,48 @@ namespace vh {
 			VkResult transferImage();
 			void deinit();
 
+			VkResult checkCapabilities();
+			VkResult createVulkanVideoSession();
+			VkResult allocateVideoSessionMemory();
+			VkResult createVideoSessionParameters(uint32_t fps);
+			VkResult allocateReferenceImages(uint32_t count);
+			VkResult createYCbCrConversionDescriptorSets(VkImage targetImage, VkImageView targetImageView);
+
+			VkResult decodeFrame();
+			VkResult convertYCbCrToRGB(uint32_t currentImageIx);
+
+
 			VHVideoDecoder* m_decoder;
 			double m_nextFrameTime = 0.0;
 
+			uint32_t m_width;
+			uint32_t m_height;
+
+			std::vector<VkDescriptorSet> m_computeDescriptorSets;
+
+			VkVideoDecodeH264CapabilitiesKHR m_h264capabilities;
+			VkVideoDecodeCapabilitiesKHR m_decodeCapabilities;
+			VkVideoCapabilitiesKHR m_videoCapabilities;
+			VkVideoDecodeH264ProfileInfoKHR m_h264videoProfile;
+			VkVideoProfileInfoKHR m_videoProfile;
+			VkVideoProfileListInfoKHR m_videoProfileList;
+			VkVideoSessionKHR m_videoSession;
+			std::vector<VmaAllocation> m_allocations;
+			StdVideoH264SequenceParameterSetVui m_vui;
+			StdVideoH264SequenceParameterSet m_sps;
+			StdVideoH264PictureParameterSet m_pps;
+			VkVideoSessionParametersKHR m_videoSessionParameters;
+
+			VkCommandBuffer m_decodeCommandBuffer;
+
+			std::vector<VkImage> m_dpbImages;
+			std::vector<VmaAllocation> m_dpbImageAllocations;
+			std::vector<VkImageView> m_dpbImageViews;
+
+			VkImage m_targetImage;
+			VkImageView m_targetImageView;
+
+			VkCommandBuffer m_computeCommandBuffer;
 
 			friend class VHVideoDecoder;
 		};
@@ -58,31 +97,19 @@ namespace vh {
 
 		VHVideoDecoder::Session* createVideoSession(const std::string& filename);
 
-		VkImageView getImageView() {
-			return m_dpbImageViews[0];
-		}
-
-		//VkResult queueEncode(uint32_t currentImageIx);
-		//VkResult finishEncode(const char*& data, size_t& size);
 		void deinit();
 
 		~VHVideoDecoder() {
 			deinit();
 		}
-
 	
 	private:
-		VkResult allocateVideoSessionMemory();
-		VkResult createVideoSessionParameters(uint32_t fps);
 		VkResult allocateYCbCrConversionSampler();
-		VkResult allocateReferenceImages(uint32_t count);
 		VkResult createYCbCrConversionPipeline();
-		VkResult createYCbCrConversionDescriptorSets(VkImage targetImage, VkImageView targetImageView);
-
-		VkResult convertYCbCrToRGB(uint32_t currentImageIx);
 
 		bool m_initialized{ false };
 
+		VkPhysicalDevice m_physicalDevice;
 		VkDevice m_device;
 		VmaAllocator m_allocator;
 		VkQueue m_graphicsQueue;
@@ -91,8 +118,6 @@ namespace vh {
 		VkQueue m_decodeQueue;
 		uint32_t m_decodeQueueFamily;
 		VkCommandPool m_decodeCommandPool;
-		uint32_t m_width;
-		uint32_t m_height;
 
 		VkSamplerYcbcrConversionInfo m_yCbCrConversionInfo;
 		VkSampler m_yCbCrConversionSampler;
@@ -100,28 +125,6 @@ namespace vh {
 		VkPipelineLayout m_computePipelineLayout;
 		VkPipeline m_computePipeline;
 		VkDescriptorPool m_descriptorPool;
-		std::vector<VkDescriptorSet> m_computeDescriptorSets;
-
-		VkVideoDecodeH264ProfileInfoKHR m_h264videoProfile;
-		VkVideoProfileInfoKHR m_videoProfile;
-		VkVideoProfileListInfoKHR m_videoProfileList;
-		VkVideoSessionKHR m_videoSession;
-		std::vector<VmaAllocation> m_allocations;
-		StdVideoH264SequenceParameterSetVui m_vui;
-		StdVideoH264SequenceParameterSet m_sps;
-		StdVideoH264PictureParameterSet m_pps;
-		VkVideoSessionParametersKHR m_videoSessionParameters;
-
-		VkCommandBuffer m_decodeCommandBuffer;
-
-		std::vector<VkImage> m_dpbImages;
-		std::vector<VmaAllocation> m_dpbImageAllocations;
-		std::vector<VkImageView> m_dpbImageViews;
-
-		VkImage m_targetImage;
-		VkImageView m_targetImageView;
-
-		VkCommandBuffer m_computeCommandBuffer;
 
 		std::unordered_set<Session*> m_sessions;
 	};
