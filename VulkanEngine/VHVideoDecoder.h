@@ -86,9 +86,11 @@ namespace vh {
 			std::vector<StdVideoDecodeH264ReferenceInfo> m_stdH264references;
 			std::vector<VkVideoDecodeH264DpbSlotInfoKHR> m_h264slots;
 			std::vector<VkVideoReferenceSlotInfoKHR> m_referenceSlots;
+			std::vector<uint64_t> m_gopPocs;
+			std::vector<bool> m_viewed;
 			uint32_t m_activeReferenceSlots;
 			uint32_t m_activeDecodePicture;
-			uint32_t m_activeViewPicture;
+			int m_activeViewPicture;
 			int m_prev_pic_order_cnt_lsb{ 0 };
 			int m_prev_pic_order_cnt_msb{ 0 };
 			int m_poc_cycle{ 0 };

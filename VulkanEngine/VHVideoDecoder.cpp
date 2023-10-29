@@ -184,9 +184,10 @@ namespace vh {
 
     VkResult VHVideoDecoder::Session::init()
     {
-        std::ifstream file(m_filename, std::ios::binary);
+        std::ifstream file(m_filename, std::ios::binary | std::ios::ate);
         assert(file.good());
-        m_data.resize(2830904);
+        m_data.resize(file.tellg());
+        file.seekg(0);
         file.read(reinterpret_cast<char*>(m_data.data()), m_data.size());
         m_nextData = m_data.data();
         m_resetPending = true;
@@ -209,19 +210,38 @@ namespace vh {
     void VHVideoDecoder::Session::process(double dt)
     {
         //const double TIME_BETWEEN_FRAMES = 1.0 / 25;
-        const double TIME_BETWEEN_FRAMES = 1.0 / 25;
+        const double TIME_BETWEEN_FRAMES = 1.0 / 10;
         m_nextFrameTime -= dt;
         if (m_nextFrameTime <= 0) {
             m_nextFrameTime += TIME_BETWEEN_FRAMES;
 
-            decodeFrame();
+            while (m_activeDecodePicture >= m_viewed.size() || m_viewed[m_activeDecodePicture])
+            {
+                decodeFrame();
+            }
             transferImage();
         }
     }
 
     VkResult VHVideoDecoder::Session::transferImage()
     {
-        return convertYCbCrToRGB(m_activeViewPicture);
+        int nextToView = -1;
+        for (int i = 0; i < m_gopPocs.size(); ++i)
+        {
+            if (!m_viewed[i]) {
+                if (nextToView < 0 || m_gopPocs[i] < m_gopPocs[nextToView])
+                {
+                    nextToView = i;
+                }
+            }
+        }
+        if (nextToView < 0)
+        {
+            return VK_SUCCESS;
+        }
+        std::cout << nextToView << ": " << (m_gopPocs[nextToView] >> 32) << ", " << (m_gopPocs[nextToView] & 0xffffffff) << std::endl;
+        m_viewed[nextToView] = true;
+        return convertYCbCrToRGB(nextToView);
     }
 
     void VHVideoDecoder::Session::getNextNAL(uint8_t*& data, size_t& len)
@@ -369,7 +389,7 @@ namespace vh {
         //double fps = 25;
         //if (m_h264sps.vui_parameters_present_flag && m_h264sps.vui.timing_info_present_flag)
         //{
-        //    fps = m_h264sps.vui.time_scale / m_h264sps.vui.num_units_in_tick;
+        //    fps = m_h264sps.vui.time_scale / m_h264sps.vui.num_units_in_tick / 2;
         //}
 
         m_sps = convertStdVideoH264SequenceParameterSet(m_h264sps);
@@ -556,7 +576,7 @@ namespace vh {
         }
         m_activeReferenceSlots = 0;
         m_activeDecodePicture = 0;
-        m_activeViewPicture = 0;
+        m_activeViewPicture = -1;
         return VK_SUCCESS;
     }
 
@@ -620,6 +640,8 @@ namespace vh {
         {
             m_activeDecodePicture = 0;
             m_activeReferenceSlots = 0;
+            //m_gopPocs.clear();
+            //m_viewed.clear();
         }
 
         h264::SliceHeader sliceHeader = {};
@@ -646,6 +668,9 @@ namespace vh {
 
         if (m_resetPending)
         {
+            m_gopPocs.clear();
+            m_viewed.clear();
+
             for (auto image : m_dpbImages) {
                 VHCHECKRESULT(vhBufTransitionImageLayout(m_decoder->m_device, m_decoder->m_decodeQueue, m_decodeCommandBuffer,
                     image, VK_FORMAT_R8G8_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
@@ -777,7 +802,16 @@ namespace vh {
 
         vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, 1, &m_decodeCommandBuffer);
 
-        m_activeViewPicture = m_activeDecodePicture;
+        //std::cout << m_activeDecodePicture << ": " << gop << ", " << poc << " (" << m_stdH264references[m_activeDecodePicture].FrameNum << ")" << std::endl;
+
+        if (m_gopPocs.size() <= m_activeDecodePicture)
+        {
+            m_gopPocs.resize(m_activeDecodePicture + 1, 0);
+            m_viewed.resize(m_activeDecodePicture + 1, true);
+        }
+        m_gopPocs[m_activeDecodePicture] = (uint64_t)gop << 32 | poc;
+        m_viewed[m_activeDecodePicture] = false;
+
         if (decodeH264pictureInfo.flags.is_reference) {
             m_activeDecodePicture = (m_activeDecodePicture + 1) % m_pictureResources.size();
             m_activeReferenceSlots = std::min(m_activeReferenceSlots + 1, (uint32_t)m_referenceSlots.size() - 1);
