@@ -182,6 +182,12 @@ namespace vh {
 
     VkResult VHVideoDecoder::Session::init()
     {
+        std::ifstream file(m_filename, std::ios::binary);
+        assert(file.good());
+        m_data.resize(2830904);
+        file.read(reinterpret_cast<char*>(m_data.data()), m_data.size());
+        m_nextData = m_data.data();
+
         m_width = 800;
         m_height = 600;
 
@@ -448,10 +454,18 @@ namespace vh {
 
     VkResult VHVideoDecoder::Session::decodeFrame()
     {
-        size_t startOffset = 0x20;
-        size_t endOffset = 0xe0c7;
-        size_t readSize = endOffset - startOffset;
-        size_t bufferSize = h264::AlignSize(readSize, m_videoCapabilities.minBitstreamBufferSizeAlignment);
+        uint8_t* endData = m_nextData + 4;
+        while (!(endData[0] == 0 && endData[1] == 0 && endData[2] == 0 && endData[3] == 1))
+        {
+            endData++;
+            if (endData >= m_data.data() + m_data.size() + 4) {
+                m_nextData = m_data.data();
+                endData = m_nextData + 4;
+            }
+        }
+
+        size_t length = endData - m_nextData;
+        size_t bufferSize = h264::AlignSize(length, m_videoCapabilities.minBitstreamBufferSizeAlignment);
 
         VkBuffer m_bitStreamBuffer;
         VmaAllocation m_bitStreamBufferAllocation;
@@ -461,16 +475,10 @@ namespace vh {
             VK_BUFFER_USAGE_VIDEO_DECODE_SRC_BIT_KHR, VMA_MEMORY_USAGE_CPU_TO_GPU, // TODO: maybe use VMA_MEMORY_USAGE_CPU_COPY
             &m_bitStreamBuffer, &m_bitStreamBufferAllocation, &m_videoProfileList));
         VHCHECKRESULT(vmaMapMemory(m_decoder->m_allocator, m_bitStreamBufferAllocation, &m_bitStreamData));
-
-        FILE* f = fopen("..\\..\\video.264", "rb");
-        assert(f != nullptr);
-        fseek(f, startOffset, SEEK_SET);
-        size_t read = fread(m_bitStreamData, readSize, 1, f);
-        assert(read == 1);
-        fclose(f);
+        memcpy(m_bitStreamData, m_nextData, length);
 
         vmaFlushAllocation(m_decoder->m_allocator, m_bitStreamBufferAllocation, 0, VK_WHOLE_SIZE);
-
+        m_nextData = endData;
 
 
         VHCHECKRESULT(vhCmdCreateCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1, &m_decodeCommandBuffer));

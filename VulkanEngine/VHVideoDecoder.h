@@ -28,7 +28,7 @@ namespace vh {
 
 		private:
 			Session(VHVideoDecoder* decoder, const std::string& filename) :
-				m_decoder{ decoder }
+				m_decoder{ decoder }, m_filename{ filename }
 			{}
 
 			VkResult init();
@@ -48,6 +48,8 @@ namespace vh {
 
 
 			VHVideoDecoder* m_decoder;
+			std::string m_filename;
+
 			double m_nextFrameTime = 0.0;
 
 			uint32_t m_width;
@@ -78,6 +80,9 @@ namespace vh {
 			VkImageView m_targetImageView;
 
 			VkCommandBuffer m_computeCommandBuffer;
+
+			std::vector<uint8_t> m_data;
+			uint8_t* m_nextData;
 
 			friend class VHVideoDecoder;
 		};
