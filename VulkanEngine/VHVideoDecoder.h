@@ -43,7 +43,7 @@ namespace vh {
 			VkResult checkCapabilities();
 			VkResult createVulkanVideoSession();
 			VkResult allocateVideoSessionMemory();
-			VkResult createVideoSessionParameters(uint32_t fps);
+			VkResult createVideoSessionParameters();
 			VkResult allocateReferenceImages(uint32_t count);
 			VkResult createYCbCrConversionDescriptorSets(VkImage targetImage, VkImageView targetImageView);
 
@@ -55,6 +55,7 @@ namespace vh {
 			std::string m_filename;
 
 			double m_nextFrameTime = 0.0;
+			bool m_resetPending;
 
 			uint32_t m_width;
 			uint32_t m_height;
@@ -69,7 +70,9 @@ namespace vh {
 			VkVideoProfileListInfoKHR m_videoProfileList;
 			VkVideoSessionKHR m_videoSession;
 			std::vector<VmaAllocation> m_allocations;
-			StdVideoH264SequenceParameterSetVui m_vui;
+			//StdVideoH264SequenceParameterSetVui m_vui;
+			h264::SPS m_h264sps;
+			h264::PPS m_h264pps;
 			StdVideoH264SequenceParameterSet m_sps;
 			StdVideoH264PictureParameterSet m_pps;
 			VkVideoSessionParametersKHR m_videoSessionParameters;
@@ -79,6 +82,16 @@ namespace vh {
 			std::vector<VkImage> m_dpbImages;
 			std::vector<VmaAllocation> m_dpbImageAllocations;
 			std::vector<VkImageView> m_dpbImageViews;
+			std::vector<VkVideoPictureResourceInfoKHR> m_pictureResources;
+			std::vector<StdVideoDecodeH264ReferenceInfo> m_stdH264references;
+			std::vector<VkVideoDecodeH264DpbSlotInfoKHR> m_h264slots;
+			std::vector<VkVideoReferenceSlotInfoKHR> m_referenceSlots;
+			uint32_t m_activeReferenceSlots;
+			uint32_t m_activeDecodePicture;
+			uint32_t m_activeViewPicture;
+			int m_prev_pic_order_cnt_lsb{ 0 };
+			int m_prev_pic_order_cnt_msb{ 0 };
+			int m_poc_cycle{ 0 };
 
 			VkImage m_targetImage;
 			VkImageView m_targetImageView;

@@ -189,13 +189,14 @@ namespace vh {
         m_data.resize(2830904);
         file.read(reinterpret_cast<char*>(m_data.data()), m_data.size());
         m_nextData = m_data.data();
+        m_resetPending = true;
 
         VHCHECKRESULT(readFileHeaders());
         VHCHECKRESULT(checkCapabilities());
         VHCHECKRESULT(createVulkanVideoSession());
         VHCHECKRESULT(allocateVideoSessionMemory());
-        VHCHECKRESULT(createVideoSessionParameters(100));
-        VHCHECKRESULT(allocateReferenceImages(2));
+        VHCHECKRESULT(createVideoSessionParameters());
+        VHCHECKRESULT(allocateReferenceImages(m_sps.max_num_ref_frames + 1));
 
         return VK_SUCCESS;
     }
@@ -207,6 +208,7 @@ namespace vh {
 
     void VHVideoDecoder::Session::process(double dt)
     {
+        //const double TIME_BETWEEN_FRAMES = 1.0 / 25;
         const double TIME_BETWEEN_FRAMES = 1.0 / 25;
         m_nextFrameTime -= dt;
         if (m_nextFrameTime <= 0) {
@@ -219,7 +221,7 @@ namespace vh {
 
     VkResult VHVideoDecoder::Session::transferImage()
     {
-        return convertYCbCrToRGB(0);
+        return convertYCbCrToRGB(m_activeViewPicture);
     }
 
     void VHVideoDecoder::Session::getNextNAL(uint8_t*& data, size_t& len)
@@ -334,9 +336,9 @@ namespace vh {
         bool spsOk = false;
         bool ppsOk = false;
         h264::NALHeader nal = {};
-        h264::SPS sps = {};
-        sps.chroma_format_idc = 1; // default to 1 in main and baseline
-        h264::PPS pps = {};
+        m_h264sps = {};
+        m_h264sps.chroma_format_idc = 1; // default to 1 in main and baseline
+        m_h264pps = {};
 
         while (!spsOk || !ppsOk) {
             getNextNAL(data, length);
@@ -346,26 +348,32 @@ namespace vh {
             switch (nal.type)
             {
             case h264::NAL_UNIT_TYPE_SPS:
-                h264::read_sps(&sps, &bitstream);
+                h264::read_sps(&m_h264sps, &bitstream);
                 spsOk = true;
                 break;
 
             case h264::NAL_UNIT_TYPE_PPS:
-                h264::read_pps(&pps, &bitstream);
+                h264::read_pps(&m_h264pps, &bitstream);
                 ppsOk = true;
                 break;
             }
         }
 
-        m_width = (sps.pic_width_in_mbs_minus1 + 1) * 16;
-        m_width -= sps.frame_crop_left_offset + sps.frame_crop_right_offset;
-        m_height = (sps.pic_height_in_map_units_minus1 + 1) * 16;
-        if (!sps.frame_mbs_only_flag)
+        m_width = (m_h264sps.pic_width_in_mbs_minus1 + 1) * 16;
+        m_width -= m_h264sps.frame_crop_left_offset + m_h264sps.frame_crop_right_offset;
+        m_height = (m_h264sps.pic_height_in_map_units_minus1 + 1) * 16;
+        if (!m_h264sps.frame_mbs_only_flag)
             m_height *= 2;
-        m_height -= sps.frame_crop_top_offset + sps.frame_crop_bottom_offset;
+        m_height -= m_h264sps.frame_crop_top_offset + m_h264sps.frame_crop_bottom_offset;
 
-        m_sps = convertStdVideoH264SequenceParameterSet(sps);
-        m_pps = convertStdVideoH264PictureParameterSet(pps);
+        //double fps = 25;
+        //if (m_h264sps.vui_parameters_present_flag && m_h264sps.vui.timing_info_present_flag)
+        //{
+        //    fps = m_h264sps.vui.time_scale / m_h264sps.vui.num_units_in_tick;
+        //}
+
+        m_sps = convertStdVideoH264SequenceParameterSet(m_h264sps);
+        m_pps = convertStdVideoH264PictureParameterSet(m_h264pps);
 
         return VK_SUCCESS;
     }
@@ -467,7 +475,7 @@ namespace vh {
             encodeSessionBindMemory.data());
     }
 
-    VkResult VHVideoDecoder::Session::createVideoSessionParameters(uint32_t fps)
+    VkResult VHVideoDecoder::Session::createVideoSessionParameters()
     {
         VkVideoDecodeH264SessionParametersAddInfoKHR decodeH264SessionParametersAddInfo = { VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_SESSION_PARAMETERS_ADD_INFO_KHR };
         decodeH264SessionParametersAddInfo.pNext = nullptr;
@@ -497,6 +505,10 @@ namespace vh {
         m_dpbImages.resize(count);
         m_dpbImageAllocations.resize(count);
         m_dpbImageViews.resize(count);
+        m_pictureResources.resize(count);
+        m_stdH264references.resize(count);
+        m_h264slots.resize(count);
+        m_referenceSlots.resize(count);
         for (uint32_t i = 0; i < count; i++) {
             VkImageCreateInfo tmpImgCreateInfo;
             tmpImgCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -518,7 +530,33 @@ namespace vh {
             allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
             VHCHECKRESULT(vmaCreateImage(m_decoder->m_allocator, &tmpImgCreateInfo, &allocInfo, &m_dpbImages[i], &m_dpbImageAllocations[i], nullptr));
             VHCHECKRESULT(vhBufCreateImageView(m_decoder->m_device, m_dpbImages[i], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_VIEW_TYPE_2D, 1, VK_IMAGE_ASPECT_COLOR_BIT, &m_dpbImageViews[i], &m_decoder->m_yCbCrConversionInfo));
+
+            m_pictureResources[i] = {VK_STRUCTURE_TYPE_VIDEO_PICTURE_RESOURCE_INFO_KHR};
+            m_pictureResources[i].imageViewBinding = m_dpbImageViews[i];
+            m_pictureResources[i].codedOffset = {0, 0};
+            m_pictureResources[i].codedExtent = {m_width, m_height};
+            m_pictureResources[i].baseArrayLayer = 0;
+
+            m_stdH264references[i] = {};
+            m_stdH264references[i].flags.top_field_flag = 0;
+            m_stdH264references[i].flags.bottom_field_flag = 0;
+            m_stdH264references[i].flags.used_for_long_term_reference = 0;
+            m_stdH264references[i].flags.is_non_existing = 0;
+            m_stdH264references[i].FrameNum = 0;
+            m_stdH264references[i].PicOrderCnt[0] = 0;
+            m_stdH264references[i].PicOrderCnt[1] = 1;
+
+            m_h264slots[i] = {VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_DPB_SLOT_INFO_KHR};
+            m_h264slots[i].pStdReferenceInfo = &m_stdH264references[i];
+
+            m_referenceSlots[i] = { VK_STRUCTURE_TYPE_VIDEO_REFERENCE_SLOT_INFO_KHR };
+            m_referenceSlots[i].pNext = &m_h264slots[i];
+            m_referenceSlots[i].pPictureResource = &m_pictureResources[i];
+            m_referenceSlots[i].slotIndex = i;
         }
+        m_activeReferenceSlots = 0;
+        m_activeDecodePicture = 0;
+        m_activeViewPicture = 0;
         return VK_SUCCESS;
     }
 
@@ -571,13 +609,21 @@ namespace vh {
         uint8_t* data;
         size_t length;
         h264::NALHeader nal = {};
+        h264::Bitstream bitstream;
         do {
             getNextNAL(data, length);
-            h264::Bitstream bitstream;
             bitstream.init(data + 3, length - 3);
             h264::read_nal_header(&nal, &bitstream);
         } while (nal.type != h264::NAL_UNIT_TYPE_CODED_SLICE_IDR && nal.type != h264::NAL_UNIT_TYPE_CODED_SLICE_NON_IDR);
 
+        if (nal.type == h264::NAL_UNIT_TYPE_CODED_SLICE_IDR)
+        {
+            m_activeDecodePicture = 0;
+            m_activeReferenceSlots = 0;
+        }
+
+        h264::SliceHeader sliceHeader = {};
+        h264::read_slice_header(&sliceHeader, &nal, &m_h264pps, &m_h264sps, &bitstream);
 
         size_t bufferSize = h264ps::AlignSize(length, m_videoCapabilities.minBitstreamBufferSizeAlignment);
 
@@ -598,72 +644,103 @@ namespace vh {
         VHCHECKRESULT(vhCmdBeginCommandBuffer(m_decoder->m_device, m_decodeCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT));
 
 
+        if (m_resetPending)
+        {
+            for (auto image : m_dpbImages) {
+                VHCHECKRESULT(vhBufTransitionImageLayout(m_decoder->m_device, m_decoder->m_decodeQueue, m_decodeCommandBuffer,
+                    image, VK_FORMAT_R8G8_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR));
+            }
+        }
 
-        VHCHECKRESULT(vhBufTransitionImageLayout(m_decoder->m_device, m_decoder->m_decodeQueue, m_decodeCommandBuffer,
-            m_dpbImages[0], VK_FORMAT_R8G8_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR));
 
-
-        VkVideoPictureResourceInfoKHR pictureResource = { VK_STRUCTURE_TYPE_VIDEO_PICTURE_RESOURCE_INFO_KHR };
-        pictureResource.imageViewBinding = m_dpbImageViews[0];
-        pictureResource.codedOffset = { 0, 0 };
-        pictureResource.codedExtent = { m_width, m_height };
-        pictureResource.baseArrayLayer = 0;
-
-        StdVideoDecodeH264ReferenceInfo stdH264reference = {};
-        stdH264reference.flags.top_field_flag = 0;
-        stdH264reference.flags.bottom_field_flag = 0;
-        stdH264reference.flags.used_for_long_term_reference = 0;
-        stdH264reference.flags.is_non_existing = 0;
-        stdH264reference.FrameNum = 0;
-        stdH264reference.PicOrderCnt[0] = 0;
-        stdH264reference.PicOrderCnt[1] = 1;
-
-        VkVideoDecodeH264DpbSlotInfoKHR h264slot = { VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_DPB_SLOT_INFO_KHR };
-        h264slot.pStdReferenceInfo = &stdH264reference;
-
-        VkVideoReferenceSlotInfoKHR referenceSlot = { VK_STRUCTURE_TYPE_VIDEO_REFERENCE_SLOT_INFO_KHR };
-        referenceSlot.pNext = &h264slot;
-        referenceSlot.pPictureResource = &pictureResource;
-        referenceSlot.slotIndex = -1;
+        m_referenceSlots[m_activeDecodePicture].slotIndex = -1;
+        m_stdH264references[m_activeDecodePicture].FrameNum = sliceHeader.frame_num;
 
         VkVideoBeginCodingInfoKHR beginInfo = { VK_STRUCTURE_TYPE_VIDEO_BEGIN_CODING_INFO_KHR };
         beginInfo.videoSession = m_videoSession;
         beginInfo.videoSessionParameters = m_videoSessionParameters;
-        beginInfo.referenceSlotCount = 1;
-        beginInfo.pReferenceSlots = &referenceSlot;
+        beginInfo.referenceSlotCount = m_activeReferenceSlots + 1;
+        beginInfo.pReferenceSlots = m_referenceSlots.data();
 
         vkCmdBeginVideoCodingKHR(m_decodeCommandBuffer, &beginInfo);
 
-        //if (reset) {
-        VkVideoCodingControlInfoKHR codingControlInfo = { VK_STRUCTURE_TYPE_VIDEO_CODING_CONTROL_INFO_KHR };
-        codingControlInfo.flags = VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR;
+        if (m_resetPending) {
+            VkVideoCodingControlInfoKHR codingControlInfo = { VK_STRUCTURE_TYPE_VIDEO_CODING_CONTROL_INFO_KHR };
+            codingControlInfo.flags = VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR;
 
-        vkCmdControlVideoCodingKHR(m_decodeCommandBuffer, &codingControlInfo);
-        //}
+            vkCmdControlVideoCodingKHR(m_decodeCommandBuffer, &codingControlInfo);
 
+            m_resetPending = false;
+        }
+
+        int max_pic_order_cnt_lsb = 1 << (m_sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
+        int pic_order_cnt_lsb = sliceHeader.pic_order_cnt_lsb;
+
+        if (pic_order_cnt_lsb == 0)
+        {
+            m_poc_cycle++;
+        }
+
+        // Rec. ITU-T H.264 (08/2021) page 115
+        // Also: https://www.ramugedia.com/negative-pocs
+        int pic_order_cnt_msb = 0;
+        if (pic_order_cnt_lsb < m_prev_pic_order_cnt_lsb && (m_prev_pic_order_cnt_lsb - pic_order_cnt_lsb) >= max_pic_order_cnt_lsb / 2)
+        {
+            pic_order_cnt_msb = m_prev_pic_order_cnt_msb + max_pic_order_cnt_lsb; // pic_order_cnt_lsb wrapped around
+        }
+        else if (pic_order_cnt_lsb > m_prev_pic_order_cnt_lsb && (pic_order_cnt_lsb - m_prev_pic_order_cnt_lsb) > max_pic_order_cnt_lsb / 2)
+        {
+            pic_order_cnt_msb = m_prev_pic_order_cnt_msb - max_pic_order_cnt_lsb; // here negative POC might occur
+        }
+        else
+        {
+            pic_order_cnt_msb = m_prev_pic_order_cnt_msb;
+        }
+        //pic_order_cnt_msb = pic_order_cnt_msb % 256;
+        m_prev_pic_order_cnt_lsb = pic_order_cnt_lsb;
+        m_prev_pic_order_cnt_msb = pic_order_cnt_msb;
+
+        // https://www.vcodex.com/h264avc-picture-management/
+        int poc = pic_order_cnt_msb + pic_order_cnt_lsb; // poc = TopFieldOrderCount
+        int gop = m_poc_cycle - 1;
 
 
         uint32_t sliceOffset = 0;
 
-        h264ps::DecodeFrameInfo frameInfo(0, m_width, m_height, m_sps, m_pps, true);
+        StdVideoDecodeH264PictureInfo decodeH264pictureInfo = {};
+        decodeH264pictureInfo.flags.field_pic_flag = sliceHeader.field_pic_flag;
+        decodeH264pictureInfo.flags.is_intra = nal.type == h264::NAL_UNIT_TYPE_CODED_SLICE_IDR ? 1 : 0;
+        decodeH264pictureInfo.flags.is_reference = nal.idc > 0 ? 1 : 0;
+        decodeH264pictureInfo.flags.IdrPicFlag = (decodeH264pictureInfo.flags.is_reference && decodeH264pictureInfo.flags.is_intra) ? 1 : 0;
+        decodeH264pictureInfo.flags.bottom_field_flag = sliceHeader.bottom_field_flag;
+        decodeH264pictureInfo.flags.complementary_field_pair = 0;
+        decodeH264pictureInfo.seq_parameter_set_id = m_pps.seq_parameter_set_id;
+        decodeH264pictureInfo.pic_parameter_set_id = sliceHeader.pic_parameter_set_id;
+        decodeH264pictureInfo.frame_num = sliceHeader.frame_num;
+        decodeH264pictureInfo.idr_pic_id = sliceHeader.idr_pic_id;
+        decodeH264pictureInfo.PicOrderCnt[0] = poc;
+        decodeH264pictureInfo.PicOrderCnt[1] = poc;
 
         VkVideoDecodeH264PictureInfoKHR h264decodeInfo = { VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_PICTURE_INFO_KHR };
-        h264decodeInfo.pStdPictureInfo = frameInfo.getDecodeH264FrameInfo();
+        h264decodeInfo.pStdPictureInfo = &decodeH264pictureInfo;
         h264decodeInfo.sliceCount = 1;
         h264decodeInfo.pSliceOffsets = &sliceOffset;
 
-        referenceSlot.slotIndex = 0;
+        m_referenceSlots[m_activeDecodePicture].slotIndex = m_activeDecodePicture;
+        size_t activeSlots = m_activeReferenceSlots + (m_activeDecodePicture < m_activeReferenceSlots ? 1 : 0);
+        std::vector<VkVideoReferenceSlotInfoKHR> refSlots;
+        std::copy_if(m_referenceSlots.begin(), m_referenceSlots.begin() + activeSlots, std::back_inserter(refSlots), [this](const VkVideoReferenceSlotInfoKHR& s) { return s.slotIndex != m_activeDecodePicture; });
 
         VkVideoDecodeInfoKHR decodeInfo = { VK_STRUCTURE_TYPE_VIDEO_DECODE_INFO_KHR };
         decodeInfo.pNext = &h264decodeInfo;
         decodeInfo.srcBuffer = m_bitStreamBuffer;
         decodeInfo.srcBufferOffset = 0;
         decodeInfo.srcBufferRange = bufferSize;
-        decodeInfo.dstPictureResource = pictureResource;
-        decodeInfo.pSetupReferenceSlot = &referenceSlot;
-        decodeInfo.referenceSlotCount = 0;
-        decodeInfo.pReferenceSlots = nullptr;
+        decodeInfo.dstPictureResource = m_pictureResources[m_activeDecodePicture];
+        decodeInfo.pSetupReferenceSlot = &m_referenceSlots[m_activeDecodePicture];
+        decodeInfo.referenceSlotCount = refSlots.size();
+        decodeInfo.pReferenceSlots = refSlots.size() ? refSlots.data() : nullptr;
 
 
         vkCmdDecodeVideoKHR(m_decodeCommandBuffer, &decodeInfo);
@@ -699,6 +776,12 @@ namespace vh {
         //delete[] dataImage;
 
         vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, 1, &m_decodeCommandBuffer);
+
+        m_activeViewPicture = m_activeDecodePicture;
+        if (decodeH264pictureInfo.flags.is_reference) {
+            m_activeDecodePicture = (m_activeDecodePicture + 1) % m_pictureResources.size();
+            m_activeReferenceSlots = std::min(m_activeReferenceSlots + 1, (uint32_t)m_referenceSlots.size() - 1);
+        }
 
         return VK_SUCCESS;
     }
