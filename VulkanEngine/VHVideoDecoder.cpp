@@ -190,15 +190,7 @@ namespace vh {
         file.read(reinterpret_cast<char*>(m_data.data()), m_data.size());
         m_nextData = m_data.data();
 
-        //m_bitStream.init(m_data.data(), m_data.size());
-
-        //h264::NALHeader header;
-        //h264::read_nal_header(&header, &m_bitStream);
-        //header.type;
-
-        m_width = 800;
-        m_height = 600;
-
+        VHCHECKRESULT(readFileHeaders());
         VHCHECKRESULT(checkCapabilities());
         VHCHECKRESULT(createVulkanVideoSession());
         VHCHECKRESULT(allocateVideoSessionMemory());
@@ -215,7 +207,7 @@ namespace vh {
 
     void VHVideoDecoder::Session::process(double dt)
     {
-        const double TIME_BETWEEN_FRAMES = 1.0 / 100;
+        const double TIME_BETWEEN_FRAMES = 1.0 / 25;
         m_nextFrameTime -= dt;
         if (m_nextFrameTime <= 0) {
             m_nextFrameTime += TIME_BETWEEN_FRAMES;
@@ -233,20 +225,22 @@ namespace vh {
     void VHVideoDecoder::Session::getNextNAL(uint8_t*& data, size_t& len)
     {
         bool alreadyLooped = false;
-        uint8_t* endData = m_nextData + 3;
-        while (!(endData[0] == 0 && endData[1] == 0 && endData[2] == 1))
-        {
-            endData++;
-            if (endData >= m_data.data() + m_data.size() + 3) {
-                assert(!alreadyLooped);
-                alreadyLooped = true;
-                m_nextData = m_data.data();
-                endData = m_nextData + 3;
+        do {
+            uint8_t* endData = m_nextData + 1;
+            while (!(endData[0] == 0 && endData[1] == 0 && endData[2] == 1))
+            {
+                endData++;
+                if (endData >= m_data.data() + m_data.size() + 3) {
+                    assert(!alreadyLooped);
+                    alreadyLooped = true;
+                    m_nextData = m_data.data();
+                    endData = m_nextData + 1;
+                }
             }
-        }
-        data = m_nextData;
-        len = endData - m_nextData;
-        m_nextData = endData;
+            data = m_nextData;
+            len = endData - m_nextData;
+            m_nextData = endData;
+        } while (len < 4);
     }
 
     void VHVideoDecoder::Session::close()
@@ -278,6 +272,103 @@ namespace vh {
         m_allocations.clear();
     }
 
+
+    static StdVideoH264SequenceParameterSet convertStdVideoH264SequenceParameterSet(h264::SPS& s)
+    {
+        StdVideoH264SpsFlags spsFlags = {};
+        spsFlags.direct_8x8_inference_flag = s.direct_8x8_inference_flag;
+        spsFlags.frame_mbs_only_flag = s.frame_mbs_only_flag;
+        spsFlags.vui_parameters_present_flag = 0u;
+        spsFlags.frame_cropping_flag = s.frame_cropping_flag;
+
+        StdVideoH264SequenceParameterSet sps = {};
+        sps.profile_idc = (StdVideoH264ProfileIdc)s.profile_idc;
+        sps.level_idc = (StdVideoH264LevelIdc)s.level_idc;
+        sps.seq_parameter_set_id = s.seq_parameter_set_id;
+        sps.chroma_format_idc = (StdVideoH264ChromaFormatIdc)s.chroma_format_idc;
+        sps.bit_depth_luma_minus8 = s.bit_depth_luma_minus8;
+        sps.bit_depth_chroma_minus8 = s.bit_depth_chroma_minus8;
+        sps.log2_max_frame_num_minus4 = s.log2_max_frame_num_minus4;
+        sps.pic_order_cnt_type = (StdVideoH264PocType)s.pic_order_cnt_type;
+        sps.max_num_ref_frames = s.num_ref_frames;
+        sps.pic_width_in_mbs_minus1 = s.pic_width_in_mbs_minus1;
+        sps.pic_height_in_map_units_minus1 = s.pic_height_in_map_units_minus1;
+        sps.flags = spsFlags;
+        sps.pSequenceParameterSetVui = nullptr;
+        sps.frame_crop_right_offset = s.frame_crop_right_offset;
+        sps.frame_crop_left_offset = s.frame_crop_left_offset;
+        sps.frame_crop_top_offset = s.frame_crop_top_offset;
+        sps.frame_crop_bottom_offset = s.frame_crop_bottom_offset;
+        sps.log2_max_pic_order_cnt_lsb_minus4 = s.log2_max_pic_order_cnt_lsb_minus4;
+
+        return sps;
+    }
+
+    static StdVideoH264PictureParameterSet convertStdVideoH264PictureParameterSet(h264::PPS& p)
+    {
+        StdVideoH264PpsFlags ppsFlags = {};
+        ppsFlags.transform_8x8_mode_flag = p.transform_8x8_mode_flag;
+        ppsFlags.constrained_intra_pred_flag = p.constrained_intra_pred_flag;
+        ppsFlags.deblocking_filter_control_present_flag = p.deblocking_filter_control_present_flag;
+        ppsFlags.entropy_coding_mode_flag = p.entropy_coding_mode_flag;
+        ppsFlags.weighted_pred_flag = p.weighted_pred_flag;
+
+        StdVideoH264PictureParameterSet pps = {};
+        pps.seq_parameter_set_id = p.seq_parameter_set_id;
+        pps.pic_parameter_set_id = p.pic_parameter_set_id;
+        pps.num_ref_idx_l0_default_active_minus1 = p.num_ref_idx_l0_active_minus1;
+        pps.weighted_bipred_idc = (StdVideoH264WeightedBipredIdc)p.weighted_bipred_idc;
+        pps.pic_init_qp_minus26 = p.pic_init_qp_minus26;
+        pps.pic_init_qs_minus26 = p.pic_init_qs_minus26;
+        pps.chroma_qp_index_offset = p.chroma_qp_index_offset;
+        pps.second_chroma_qp_index_offset = p.second_chroma_qp_index_offset;
+        pps.flags = ppsFlags;
+
+        return pps;
+    }
+
+    VkResult VHVideoDecoder::Session::readFileHeaders()
+    {
+        uint8_t* data;
+        size_t length;
+        bool spsOk = false;
+        bool ppsOk = false;
+        h264::NALHeader nal = {};
+        h264::SPS sps = {};
+        sps.chroma_format_idc = 1; // default to 1 in main and baseline
+        h264::PPS pps = {};
+
+        while (!spsOk || !ppsOk) {
+            getNextNAL(data, length);
+            h264::Bitstream bitstream;
+            bitstream.init(data + 3, length - 3);
+            h264::read_nal_header(&nal, &bitstream);
+            switch (nal.type)
+            {
+            case h264::NAL_UNIT_TYPE_SPS:
+                h264::read_sps(&sps, &bitstream);
+                spsOk = true;
+                break;
+
+            case h264::NAL_UNIT_TYPE_PPS:
+                h264::read_pps(&pps, &bitstream);
+                ppsOk = true;
+                break;
+            }
+        }
+
+        m_width = (sps.pic_width_in_mbs_minus1 + 1) * 16;
+        m_width -= sps.frame_crop_left_offset + sps.frame_crop_right_offset;
+        m_height = (sps.pic_height_in_map_units_minus1 + 1) * 16;
+        if (!sps.frame_mbs_only_flag)
+            m_height *= 2;
+        m_height -= sps.frame_crop_top_offset + sps.frame_crop_bottom_offset;
+
+        m_sps = convertStdVideoH264SequenceParameterSet(sps);
+        m_pps = convertStdVideoH264PictureParameterSet(pps);
+
+        return VK_SUCCESS;
+    }
 
     VkResult VHVideoDecoder::Session::checkCapabilities()
     {
@@ -378,10 +469,6 @@ namespace vh {
 
     VkResult VHVideoDecoder::Session::createVideoSessionParameters(uint32_t fps)
     {
-        m_vui = h264ps::getStdVideoH264SequenceParameterSetVui(fps);
-        m_sps = h264ps::getStdVideoH264SequenceParameterSet(m_width, m_height, &m_vui);
-        m_pps = h264ps::getStdVideoH264PictureParameterSet();
-
         VkVideoDecodeH264SessionParametersAddInfoKHR decodeH264SessionParametersAddInfo = { VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_SESSION_PARAMETERS_ADD_INFO_KHR };
         decodeH264SessionParametersAddInfo.pNext = nullptr;
         decodeH264SessionParametersAddInfo.stdSPSCount = 1;
@@ -489,7 +576,7 @@ namespace vh {
             h264::Bitstream bitstream;
             bitstream.init(data + 3, length - 3);
             h264::read_nal_header(&nal, &bitstream);
-        } while (nal.type != h264::NAL_UNIT_TYPE_CODED_SLICE_IDR);
+        } while (nal.type != h264::NAL_UNIT_TYPE_CODED_SLICE_IDR && nal.type != h264::NAL_UNIT_TYPE_CODED_SLICE_NON_IDR);
 
 
         size_t bufferSize = h264ps::AlignSize(length, m_videoCapabilities.minBitstreamBufferSizeAlignment);

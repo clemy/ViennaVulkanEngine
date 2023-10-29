@@ -39,6 +39,7 @@ namespace vh {
 
 			void getNextNAL(uint8_t*& data, size_t& len);
 
+			VkResult readFileHeaders();
 			VkResult checkCapabilities();
 			VkResult createVulkanVideoSession();
 			VkResult allocateVideoSessionMemory();
