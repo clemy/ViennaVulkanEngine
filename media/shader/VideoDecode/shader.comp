@@ -1,0 +1,13 @@
+#version 450
+
+layout (binding = 0) uniform sampler2D inputImage;
+layout (binding = 1, rgba8) uniform writeonly image2D outputImage;
+
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+void main() {
+// TODO: fix rounding error here: either provide texture size via parameter or increase texture size to multiple of block size
+    vec3 rgb = texture(inputImage, ivec2(gl_GlobalInvocationID.xy) / vec2(gl_NumWorkGroups * gl_WorkGroupSize)).xyz;
+
+    imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), vec4(rgb, 0.0));
+}

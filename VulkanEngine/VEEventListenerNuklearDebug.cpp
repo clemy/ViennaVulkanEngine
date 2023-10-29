@@ -76,6 +76,10 @@ namespace ve
 			sprintf(outbuffer, "  Present (ms): %4.1f", getEnginePointer()->getAvgPresentTime() * 1000.0f);
 			nk_label(ctx, outbuffer, NK_TEXT_LEFT);
 
+			nk_layout_row_dynamic(ctx, 30, 1);
+			sprintf(outbuffer, "  Video Decode (ms): %4.1f", getEnginePointer()->getAvgVideoTime() * 1000.0f);
+			nk_label(ctx, outbuffer, NK_TEXT_LEFT);
+
 			//----------------------------------------------------------
 			nk_layout_row_dynamic(ctx, 30, 1);
 			nk_label(ctx, "RECORDING", NK_TEXT_LEFT);

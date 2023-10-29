@@ -169,12 +169,6 @@
     <ClCompile Include="VHVideoDecoder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VESubrenderFW_Video.h">
-      <Filter>Header Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VESubrenderFW_Video.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\BottomLevelASGenerator.h">
@@ -327,6 +321,7 @@
     <ClInclude Include="H264ParameterSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="VESubrenderFW_Video.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\CMakeLists.txt" />

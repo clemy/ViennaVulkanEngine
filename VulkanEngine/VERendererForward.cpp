@@ -249,6 +249,15 @@ namespace ve
 
 		createSyncObjects();
 
+		if (m_videoDecodeAvailable) {
+			vh::QueueFamilyIndices queueFamilyIndices =
+				vh::vhDevFindQueueFamilies(m_physicalDevice, m_surface, true);
+
+			m_videoDecoder.init(m_physicalDevice, m_device, m_vmaAllocator,
+				m_graphicsQueue, queueFamilyIndices.graphicsFamily, m_commandPool,
+				m_videoDecodeQueue, queueFamilyIndices.videoDecodeFamily, m_videoDecodeCommandPool);
+		}
+
 		createSubrenderers();
 	}
 
@@ -266,9 +275,6 @@ namespace ve
 
 		//---------------------------------Cloth-Simulation-Stuff-----------------------------------
 		addSubrenderer(new VESubrenderFW_Cloth(*this));
-#
-		if (m_videoDecodeAvailable)
-			addSubrenderer(new VESubrenderFW_Video(*this));
 	}
 
 	/**
@@ -300,6 +306,8 @@ namespace ve
 	void VERendererForward::closeRenderer()
 	{
 		destroySubrenderers();
+
+		m_videoDecoder.deinit();
 
 		deleteCmdBuffers();
 

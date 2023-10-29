@@ -44,9 +44,6 @@ namespace ve
 		//-------------------------------Cloth-Simulation-Stuff---------------------------------
 		// by Felix Neumann
 		VE_SUBRENDERER_TYPE_CLOTH,	///<Use a Diffuse texture to draw a cloth (two sided)
-
-		//------------------------------- Video Decoding ---------------------------------
-		VE_SUBRENDERER_TYPE_VIDEO
 	};
 
 } // namespace ve

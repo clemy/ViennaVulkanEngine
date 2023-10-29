@@ -91,6 +91,8 @@ namespace ve
 		VkDescriptorPool m_descriptorPool; ///<Descriptor pool for creating descriptor sets
 		VkDescriptorSetLayout m_descriptorSetLayoutPerObject; ///<Descriptor set layout for each scene object
 
+		vh::VHVideoDecoder m_videoDecoder;
+
 		//subrenderers
 		std::vector<VESubrender *> m_subrenderers; ///<Subrenderers for lit objects
 		VESubrender *m_subrenderShadow = nullptr; ///<Pointer to the shadow subrenderer
@@ -254,6 +256,8 @@ namespace ve
 
 		///\returns the depth map vector
 		virtual VETexture *getDepthMap() = 0;
+
+		virtual vh::VHVideoDecoder* getVideoDecoder() { return &m_videoDecoder; }
 	};
 
 } // namespace ve

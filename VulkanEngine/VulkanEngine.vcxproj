@@ -157,8 +157,6 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\BottomLevelASGenerator.cpp" />
-    <ClCompile Include="VESubrenderFW_Video.cpp" />
-    <ClInclude Include="VESubrenderFW_Video.h" />
     <ClCompile Include="VHVideoDecoder.cpp" />
     <ClInclude Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\BottomLevelASGenerator.h" />
     <ClCompile Include="C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\VulkanEngine\DescriptorSetGenerator.cpp" />

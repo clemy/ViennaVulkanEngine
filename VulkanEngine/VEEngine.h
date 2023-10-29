@@ -75,6 +75,7 @@ namespace ve
 		float m_AvgPresentTime = 0.0f; ///<Average time for presenting the frame
 		float m_AvgPrepOvlTime = 0.0f; ///<Average prepare overlay time
 		float m_AvgDrawOvlTime = 0.0f; ///<Average draw overlay time
+		float m_AvgVideoTime = 0.0f; ///<Average video decoding time
 
 		bool m_framebufferResized = false; ///<Flag indicating whether the window size has changed.
 		bool m_end_running = false; ///<Flag indicating that the engine should leave the render loop
@@ -227,6 +228,12 @@ namespace ve
 		{
 			return m_AvgDrawOvlTime;
 		};
+
+		///\returns the average video decoding time (s)
+		float getAvgVideoTime()
+		{
+			return m_AvgVideoTime;
+		}
 
 		bool isRayTracing()
 		{

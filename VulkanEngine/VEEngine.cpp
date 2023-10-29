@@ -604,6 +604,10 @@ namespace ve
 
 			m_pRenderer->acquireFrame();
 
+			t_now = vh::vhTimeNow();
+			m_pRenderer->getVideoDecoder()->process(m_dt);
+			m_AvgVideoTime = vh::vhAverage(vh::vhTimeDuration(t_now), m_AvgVideoTime);
+
 			//----------------------------------------------------------------------------------
 			//update world matrices and send them to the GPU
 

@@ -187,13 +187,6 @@ namespace ve
 		if (texNames.size() == 0)
 			return;
 
-		if (texNames.size() == 1 && texNames[0].ends_with(".h264"))
-		{
-			// Video texture
-			m_format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
-			return;
-		}
-
 		VECHECKRESULT(vh::vhBufCreateTextureImage(getEnginePointer()->getRenderer()->getDevice(),
 			getEnginePointer()->getRenderer()->getVmaAllocator(),
 			getEnginePointer()->getRenderer()->getGraphicsQueue(),
@@ -208,6 +201,47 @@ namespace ve
 
 		VECHECKRESULT(
 			vh::vhBufCreateTextureSampler(getEnginePointer()->getRenderer()->getDevice(), &m_imageInfo.sampler));
+	}
+
+	/**
+	*
+	* \brief VETexture constructor for an empty texture of given size
+	*
+	* Create a VETexture with an empty image. Size must be given.
+	*
+	* \param[in] name The name of the texture.
+	* \param[in] videoSession The linked video session.
+	*
+	*/
+	VETexture::VETexture(std::string name,
+		vh::VHVideoDecoder::Session* videoSession)
+		: VENamedClass(name),
+		m_videoSession{videoSession}
+	{
+		m_format = VK_FORMAT_R8G8B8A8_UNORM;
+
+		VECHECKRESULT(vh::vhBufCreateImage(getEnginePointer()->getRenderer()->getVmaAllocator(),
+			videoSession->getWidth(), videoSession->getHeight(), 1, 1,
+			m_format, VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+			0, &m_image, &m_deviceAllocation));
+
+		VECHECKRESULT(vh::vhBufTransitionImageLayout(getEnginePointer()->getRenderer()->getDevice(),
+			getEnginePointer()->getRenderer()->getGraphicsQueue(),
+			getEnginePointer()->getRenderer()->getCommandPool(),
+			m_image,
+			m_format, VK_IMAGE_ASPECT_COLOR_BIT, 1, 1,
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+
+		VECHECKRESULT(vh::vhBufCreateImageView(getEnginePointer()->getRenderer()->getDevice(), m_image,
+			m_format, VK_IMAGE_VIEW_TYPE_2D,
+			1, VK_IMAGE_ASPECT_COLOR_BIT,
+			&m_imageInfo.imageView));
+
+		VECHECKRESULT(
+			vh::vhBufCreateTextureSampler(getEnginePointer()->getRenderer()->getDevice(), &m_imageInfo.sampler));
+
+		videoSession->assignTransferTarget(m_image, m_imageInfo.imageView);
 	}
 
 	/**
@@ -243,6 +277,8 @@ namespace ve
 				*/
 	VETexture::~VETexture()
 	{
+		if (m_videoSession)
+			m_videoSession->close();
 		if (m_imageInfo.sampler != VK_NULL_HANDLE)
 			vkDestroySampler(getEnginePointer()->getRenderer()->getDevice(), m_imageInfo.sampler, nullptr);
 		if (m_imageInfo.imageView != VK_NULL_HANDLE)

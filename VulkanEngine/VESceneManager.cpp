@@ -1152,7 +1152,18 @@ namespace ve
 		if (m_textures.count(name) > 0)
 			return m_textures[name]; //if the texture already exists, return it
 
-		VETexture *pTex = new VETexture(name, basedir, { texName }); //create the texture
+		VETexture* pTex;
+		if (texName.ends_with(".h264"))
+		{
+			// Video texture
+			std::string filename = basedir + "/" + texName;
+			vh::VHVideoDecoder::Session* videoSession = getEnginePointer()->getRenderer()->getVideoDecoder()->createVideoSession(filename);
+			pTex = new VETexture(name, videoSession);
+		}
+		else
+		{
+			pTex = new VETexture(name, basedir, { texName }); //create the texture
+		}
 		m_textures[name] = pTex; //store in texture list
 		return pTex;
 	}

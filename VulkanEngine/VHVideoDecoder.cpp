@@ -13,11 +13,12 @@ namespace vh {
         VkPhysicalDevice physicalDevice,
         VkDevice device,
         VmaAllocator allocator,
+        VkQueue graphicsQueue,
         uint32_t graphicsQueueFamily,
+        VkCommandPool graphicsCommandPool,
         VkQueue decodeQueue,
         uint32_t decodeQueueFamily,
-        VkCommandPool decodeCommandPool,
-        const VkSamplerYcbcrConversionInfo* pYCbCrConversionInfo)
+        VkCommandPool decodeCommandPool)
     {
         //assert(!m_running);
 
@@ -39,11 +40,12 @@ namespace vh {
 
         m_device = device;
         m_allocator = allocator;
+        m_graphicsQueue = graphicsQueue;
         m_graphicsQueueFamily = graphicsQueueFamily;
+        m_graphicsCommandPool = graphicsCommandPool;
         m_decodeQueue = decodeQueue;
         m_decodeQueueFamily = decodeQueueFamily;
         m_decodeCommandPool = decodeCommandPool;
-        m_pYCbCrConversionInfo = pYCbCrConversionInfo;
         m_width = 800;
         m_height = 600;
 
@@ -101,8 +103,9 @@ namespace vh {
         VHCHECKRESULT(vkCreateVideoSessionKHR(m_device, &createInfo, nullptr, &m_videoSession));
 
         VHCHECKRESULT(allocateVideoSessionMemory());
+        VHCHECKRESULT(allocateYCbCrConversionSampler());
         VHCHECKRESULT(createVideoSessionParameters(100));
-
+        VHCHECKRESULT(createYCbCrConversionPipeline());
 
 
         size_t startOffset = 0x20;
@@ -210,9 +213,9 @@ namespace vh {
         VkVideoEndCodingInfoKHR encodeEndInfo = { VK_STRUCTURE_TYPE_VIDEO_END_CODING_INFO_KHR };
         vkCmdEndVideoCodingKHR(m_decodeCommandBuffer, &encodeEndInfo);
 
-        VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_decodeQueue, m_decodeCommandBuffer,
-            m_dpbImages[0], VK_FORMAT_R8G8_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
-            VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+        //VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_decodeQueue, m_decodeCommandBuffer,
+        //    m_dpbImages[0], VK_FORMAT_R8G8_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
+        //    VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
 
 
         VHCHECKRESULT(vkEndCommandBuffer(m_decodeCommandBuffer));
@@ -237,6 +240,25 @@ namespace vh {
 
         m_initialized = true;
         return VK_SUCCESS;
+    }
+
+    void VHVideoDecoder::process(double dt)
+    {
+        for (Session* session : m_sessions)
+        {
+            session->process(dt);
+        }
+    }
+
+    VHVideoDecoder::Session* VHVideoDecoder::createVideoSession(const std::string& filename) {
+        Session* session = new Session(this, filename);
+        m_sessions.insert(session);
+        if (session->init() != VK_SUCCESS)
+        {
+            session->close();
+            return nullptr;
+        }
+        return session;
     }
 
     VkResult VHVideoDecoder::allocateVideoSessionMemory()
@@ -301,6 +323,36 @@ namespace vh {
         return vkCreateVideoSessionParametersKHR(m_device, &sessionParametersCreateInfo, nullptr, &m_videoSessionParameters);
     }
 
+    VkResult VHVideoDecoder::allocateYCbCrConversionSampler()
+    {
+        VkSamplerYcbcrConversionCreateInfo yCbCrConversionCreateInfo = { VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO };
+        yCbCrConversionCreateInfo.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+        yCbCrConversionCreateInfo.ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709; // limitation: color model should depend on video file
+
+        m_yCbCrConversionInfo = { VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO };
+        VHCHECKRESULT(vkCreateSamplerYcbcrConversionKHR(m_device, &yCbCrConversionCreateInfo, nullptr, &m_yCbCrConversionInfo.conversion));
+
+        VkSamplerCreateInfo samplerInfo = {};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.maxAnisotropy = 16;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.pNext = &m_yCbCrConversionInfo;
+
+        VHCHECKRESULT(vkCreateSampler(m_device, &samplerInfo, nullptr, &m_yCbCrConversionSampler));
+
+        return VK_SUCCESS;
+    }
+
     VkResult VHVideoDecoder::allocateReferenceImages(uint32_t count)
     {
         uint32_t queueFamilies[] = { m_graphicsQueueFamily, m_decodeQueueFamily };
@@ -328,8 +380,147 @@ namespace vh {
             VmaAllocationCreateInfo allocInfo = {};
             allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
             VHCHECKRESULT(vmaCreateImage(m_allocator, &tmpImgCreateInfo, &allocInfo, &m_dpbImages[i], &m_dpbImageAllocations[i], nullptr));
-            VHCHECKRESULT(vhBufCreateImageView(m_device, m_dpbImages[i], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_VIEW_TYPE_2D, 1, VK_IMAGE_ASPECT_COLOR_BIT, &m_dpbImageViews[i], m_pYCbCrConversionInfo));
+            VHCHECKRESULT(vhBufCreateImageView(m_device, m_dpbImages[i], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_VIEW_TYPE_2D, 1, VK_IMAGE_ASPECT_COLOR_BIT, &m_dpbImageViews[i], &m_yCbCrConversionInfo));
         }
+        return VK_SUCCESS;
+    }
+
+    VkResult VHVideoDecoder::createYCbCrConversionPipeline()
+    {
+        auto computeShaderCode = vhFileRead("../../media/shader/VideoDecode/comp.spv");
+        VkShaderModule computeShaderModule = vhPipeCreateShaderModule(m_device, computeShaderCode);
+        VkPipelineShaderStageCreateInfo computeShaderStageInfo{};
+        computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        computeShaderStageInfo.module = computeShaderModule;
+        computeShaderStageInfo.pName = "main";
+
+        std::array<VkDescriptorSetLayoutBinding, 2> layoutBindings{};
+        for (uint32_t i = 0; i < layoutBindings.size(); i++) {
+            layoutBindings[i].binding = i;
+            layoutBindings[i].descriptorCount = 1;
+            layoutBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        }
+        layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        layoutBindings[0].pImmutableSamplers = &m_yCbCrConversionSampler;
+        layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layoutBindings[1].pImmutableSamplers = nullptr;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = (uint32_t)layoutBindings.size();
+        layoutInfo.pBindings = layoutBindings.data();
+        VHCHECKRESULT(vkCreateDescriptorSetLayout(m_device, &layoutInfo, nullptr, &m_computeDescriptorSetLayout));
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &m_computeDescriptorSetLayout;
+        VHCHECKRESULT(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_computePipelineLayout));
+
+        VkComputePipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineInfo.layout = m_computePipelineLayout;
+        pipelineInfo.stage = computeShaderStageInfo;
+        VHCHECKRESULT(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_computePipeline));
+
+        vkDestroyShaderModule(m_device, computeShaderModule, nullptr);
+
+        const int maxFramesCount = 17;
+        const int maxStreamsCount = 6;
+        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[0].descriptorCount = maxFramesCount * maxStreamsCount;
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        poolSizes[1].descriptorCount = maxFramesCount * maxStreamsCount;
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = (uint32_t)poolSizes.size();
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = maxFramesCount * maxStreamsCount;
+        //poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; // allow freeing
+        VHCHECKRESULT(vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &m_descriptorPool));
+
+        return VK_SUCCESS;
+    }
+
+    VkResult VHVideoDecoder::createYCbCrConversionDescriptorSets(VkImage targetImage, VkImageView targetImageView)
+    {
+        m_targetImage = targetImage;
+        m_targetImageView = targetImageView;
+
+        std::vector<VkDescriptorSetLayout> layouts(m_dpbImageViews.size(), m_computeDescriptorSetLayout);
+        VkDescriptorSetAllocateInfo descAllocInfo{};
+        descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        descAllocInfo.descriptorPool = m_descriptorPool;
+        descAllocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
+        descAllocInfo.pSetLayouts = layouts.data();
+        m_computeDescriptorSets.resize(descAllocInfo.descriptorSetCount);
+        VHCHECKRESULT(vkAllocateDescriptorSets(m_device, &descAllocInfo, m_computeDescriptorSets.data()));
+
+        for (size_t i = 0; i < m_computeDescriptorSets.size(); i++) {
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+            VkDescriptorImageInfo imageInfo0{};
+            imageInfo0.imageView = m_dpbImageViews[i];
+            imageInfo0.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = m_computeDescriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pImageInfo = &imageInfo0;
+
+            VkDescriptorImageInfo imageInfo1{};
+            imageInfo1.imageView = m_targetImageView;
+            imageInfo1.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = m_computeDescriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pImageInfo = &imageInfo1;
+
+            vkUpdateDescriptorSets(m_device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+        }
+        return VK_SUCCESS;
+    }
+
+    VkResult VHVideoDecoder::convertYCbCrToRGB(uint32_t currentImageIx)
+    {
+        // begin command buffer for compute shader
+        VHCHECKRESULT(vhCmdCreateCommandBuffers(m_device, m_graphicsCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1, &m_computeCommandBuffer));
+        VHCHECKRESULT(vhCmdBeginCommandBuffer(m_device, m_computeCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT));
+
+        VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_graphicsQueue, m_computeCommandBuffer,
+            m_dpbImages[currentImageIx], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
+            VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+
+        VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_graphicsQueue, m_computeCommandBuffer,
+            m_targetImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1, 1,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL));
+
+        // run the YCbCr->RGB conversion shader
+        vkCmdBindPipeline(m_computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
+        vkCmdBindDescriptorSets(m_computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipelineLayout, 0, 1, &m_computeDescriptorSets[currentImageIx], 0, 0);
+        vkCmdDispatch(m_computeCommandBuffer, (m_width + 15) / 16, (m_height + 15) / 16, 1); // work item local size = 16x16
+
+        VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_graphicsQueue, m_computeCommandBuffer,
+            m_targetImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1, 1,
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+
+        VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_graphicsQueue, m_computeCommandBuffer,
+            m_dpbImages[currentImageIx], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR));
+
+        VHCHECKRESULT(vkEndCommandBuffer(m_computeCommandBuffer));
+        VHCHECKRESULT(vhCmdSubmitCommandBuffer(m_device, m_graphicsQueue, m_computeCommandBuffer, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE));
+
+        VHCHECKRESULT(vkQueueWaitIdle(m_graphicsQueue)); // TODO: replace with better synchronization!
+
+
         return VK_SUCCESS;
     }
 
@@ -339,12 +530,25 @@ namespace vh {
             return;
         }
 
+        for (Session* session: m_sessions)
+        {
+            session->deinit();
+            delete session;
+        }
+        m_sessions.clear();
+
         //if (m_running) {
         //    const char* data;
         //    size_t size;
         //    getOutputVideoPacket(data, size);
+            vkFreeCommandBuffers(m_device, m_graphicsCommandPool, 1, &m_computeCommandBuffer);
             vkFreeCommandBuffers(m_device, m_decodeCommandPool, 1, &m_decodeCommandBuffer);
         //}
+
+        vkDestroyPipeline(m_device, m_computePipeline, nullptr);
+        vkDestroyPipelineLayout(m_device, m_computePipelineLayout, nullptr);
+        vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(m_device, m_computeDescriptorSetLayout, nullptr);
 
         vkDestroyVideoSessionParametersKHR(m_device, m_videoSessionParameters, nullptr);
         for (uint32_t i = 0; i < m_dpbImages.size(); i++) {
@@ -357,6 +561,48 @@ namespace vh {
         }
         m_allocations.clear();
 
+        vkDestroySampler(m_device, m_yCbCrConversionSampler, nullptr);
+        vkDestroySamplerYcbcrConversionKHR(m_device, m_yCbCrConversionInfo.conversion, nullptr);
+
         m_initialized = false;
+    }
+
+    /*----------------------------------------------------------------------------*/
+
+    VkResult VHVideoDecoder::Session::init()
+    {
+        return VK_SUCCESS;
+    }
+
+    VkResult VHVideoDecoder::Session::assignTransferTarget(VkImage targetImage, VkImageView targetImageView)
+    {
+        return m_decoder->createYCbCrConversionDescriptorSets(targetImage, targetImageView);
+    }
+
+    void VHVideoDecoder::Session::process(double dt)
+    {
+        const double TIME_BETWEEN_FRAMES = 1.0 / 100;
+        m_nextFrameTime -= dt;
+        if (m_nextFrameTime <= 0) {
+            m_nextFrameTime += TIME_BETWEEN_FRAMES;
+
+            transferImage();
+        }
+    }
+
+    VkResult VHVideoDecoder::Session::transferImage()
+    {
+        return m_decoder->convertYCbCrToRGB(0);
+    }
+
+    void VHVideoDecoder::Session::close()
+    {
+        deinit();
+        m_decoder->m_sessions.erase(this);
+        delete this;
+    }
+
+    void VHVideoDecoder::Session::deinit()
+    {
     }
 };

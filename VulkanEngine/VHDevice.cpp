@@ -113,7 +113,8 @@ namespace vh
 		int i = 0;
 		for (const auto &queueFamily : queueFamilies)
 		{
-			if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
+				(!withVideo || queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
 			{
 				indices.graphicsFamily = i;
 			}
