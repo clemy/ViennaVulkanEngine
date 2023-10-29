@@ -58,7 +58,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\Assimp\include;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\glfw\include;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\glm;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\nuklear;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\stb;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\threadpool;C:\VulkanSDK\1.3.261.1\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\Assimp\include;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\glfw\include;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\glm;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\nuklear;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\stb;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\threadpool;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\h264;C:\VulkanSDK\1.3.261.1\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -92,7 +92,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\Assimp\include;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\glfw\include;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\glm;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\nuklear;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\stb;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\threadpool;C:\VulkanSDK\1.3.261.1\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\Assimp\include;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\glfw\include;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\glm;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\nuklear;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\stb;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\threadpool;C:\Users\clemy\source\repos\ViennaEngines\ViennaVulkanEngine\external\h264;C:\VulkanSDK\1.3.261.1\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <ExceptionHandling>Sync</ExceptionHandling>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>

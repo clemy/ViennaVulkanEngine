@@ -9,6 +9,7 @@
 #define VHVIDEODECODER_H
 
 #include "VHHelper.h"
+#include "h264.h"
 
 namespace vh {
     class VHVideoDecoder {
@@ -35,6 +36,8 @@ namespace vh {
 			void process(double dt);
 			VkResult transferImage();
 			void deinit();
+
+			void getNextNAL(uint8_t*& data, size_t& len);
 
 			VkResult checkCapabilities();
 			VkResult createVulkanVideoSession();

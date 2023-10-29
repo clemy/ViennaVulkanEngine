@@ -5,8 +5,10 @@
 *
 */
 
+#define H264_IMPLEMENTATION
 #include "VHVideoDecoder.h"
 #include "H264ParameterSet.h"
+#include "h264.h"
 
 namespace vh {
     VkResult VHVideoDecoder::init(
@@ -188,6 +190,12 @@ namespace vh {
         file.read(reinterpret_cast<char*>(m_data.data()), m_data.size());
         m_nextData = m_data.data();
 
+        //m_bitStream.init(m_data.data(), m_data.size());
+
+        //h264::NALHeader header;
+        //h264::read_nal_header(&header, &m_bitStream);
+        //header.type;
+
         m_width = 800;
         m_height = 600;
 
@@ -220,6 +228,25 @@ namespace vh {
     VkResult VHVideoDecoder::Session::transferImage()
     {
         return convertYCbCrToRGB(0);
+    }
+
+    void VHVideoDecoder::Session::getNextNAL(uint8_t*& data, size_t& len)
+    {
+        bool alreadyLooped = false;
+        uint8_t* endData = m_nextData + 3;
+        while (!(endData[0] == 0 && endData[1] == 0 && endData[2] == 1))
+        {
+            endData++;
+            if (endData >= m_data.data() + m_data.size() + 3) {
+                assert(!alreadyLooped);
+                alreadyLooped = true;
+                m_nextData = m_data.data();
+                endData = m_nextData + 3;
+            }
+        }
+        data = m_nextData;
+        len = endData - m_nextData;
+        m_nextData = endData;
     }
 
     void VHVideoDecoder::Session::close()
@@ -351,9 +378,9 @@ namespace vh {
 
     VkResult VHVideoDecoder::Session::createVideoSessionParameters(uint32_t fps)
     {
-        m_vui = h264::getStdVideoH264SequenceParameterSetVui(fps);
-        m_sps = h264::getStdVideoH264SequenceParameterSet(m_width, m_height, &m_vui);
-        m_pps = h264::getStdVideoH264PictureParameterSet();
+        m_vui = h264ps::getStdVideoH264SequenceParameterSetVui(fps);
+        m_sps = h264ps::getStdVideoH264SequenceParameterSet(m_width, m_height, &m_vui);
+        m_pps = h264ps::getStdVideoH264PictureParameterSet();
 
         VkVideoDecodeH264SessionParametersAddInfoKHR decodeH264SessionParametersAddInfo = { VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_SESSION_PARAMETERS_ADD_INFO_KHR };
         decodeH264SessionParametersAddInfo.pNext = nullptr;
@@ -454,18 +481,18 @@ namespace vh {
 
     VkResult VHVideoDecoder::Session::decodeFrame()
     {
-        uint8_t* endData = m_nextData + 4;
-        while (!(endData[0] == 0 && endData[1] == 0 && endData[2] == 0 && endData[3] == 1))
-        {
-            endData++;
-            if (endData >= m_data.data() + m_data.size() + 4) {
-                m_nextData = m_data.data();
-                endData = m_nextData + 4;
-            }
-        }
+        uint8_t* data;
+        size_t length;
+        h264::NALHeader nal = {};
+        do {
+            getNextNAL(data, length);
+            h264::Bitstream bitstream;
+            bitstream.init(data + 3, length - 3);
+            h264::read_nal_header(&nal, &bitstream);
+        } while (nal.type != h264::NAL_UNIT_TYPE_CODED_SLICE_IDR);
 
-        size_t length = endData - m_nextData;
-        size_t bufferSize = h264::AlignSize(length, m_videoCapabilities.minBitstreamBufferSizeAlignment);
+
+        size_t bufferSize = h264ps::AlignSize(length, m_videoCapabilities.minBitstreamBufferSizeAlignment);
 
         VkBuffer m_bitStreamBuffer;
         VmaAllocation m_bitStreamBufferAllocation;
@@ -475,10 +502,9 @@ namespace vh {
             VK_BUFFER_USAGE_VIDEO_DECODE_SRC_BIT_KHR, VMA_MEMORY_USAGE_CPU_TO_GPU, // TODO: maybe use VMA_MEMORY_USAGE_CPU_COPY
             &m_bitStreamBuffer, &m_bitStreamBufferAllocation, &m_videoProfileList));
         VHCHECKRESULT(vmaMapMemory(m_decoder->m_allocator, m_bitStreamBufferAllocation, &m_bitStreamData));
-        memcpy(m_bitStreamData, m_nextData, length);
+        memcpy(m_bitStreamData, data, length);
 
         vmaFlushAllocation(m_decoder->m_allocator, m_bitStreamBufferAllocation, 0, VK_WHOLE_SIZE);
-        m_nextData = endData;
 
 
         VHCHECKRESULT(vhCmdCreateCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1, &m_decodeCommandBuffer));
@@ -533,7 +559,7 @@ namespace vh {
 
         uint32_t sliceOffset = 0;
 
-        h264::DecodeFrameInfo frameInfo(0, m_width, m_height, m_sps, m_pps, true);
+        h264ps::DecodeFrameInfo frameInfo(0, m_width, m_height, m_sps, m_pps, true);
 
         VkVideoDecodeH264PictureInfoKHR h264decodeInfo = { VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_PICTURE_INFO_KHR };
         h264decodeInfo.pStdPictureInfo = frameInfo.getDecodeH264FrameInfo();
