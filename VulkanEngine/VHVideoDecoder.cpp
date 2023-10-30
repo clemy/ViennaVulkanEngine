@@ -210,7 +210,7 @@ namespace vh {
     void VHVideoDecoder::Session::process(double dt)
     {
         //const double TIME_BETWEEN_FRAMES = 1.0 / 25;
-        const double TIME_BETWEEN_FRAMES = 1.0 / 10;
+        const double TIME_BETWEEN_FRAMES = 1.0 / 30;
         m_nextFrameTime -= dt;
         if (m_nextFrameTime <= 0) {
             m_nextFrameTime += TIME_BETWEEN_FRAMES;
@@ -239,7 +239,7 @@ namespace vh {
         {
             return VK_SUCCESS;
         }
-        std::cout << nextToView << ": " << (m_gopPocs[nextToView] >> 32) << ", " << (m_gopPocs[nextToView] & 0xffffffff) << std::endl;
+        //std::cout << nextToView << ": " << (m_gopPocs[nextToView] >> 32) << ", " << (m_gopPocs[nextToView] & 0xffffffff) << std::endl;
         m_viewed[nextToView] = true;
         return convertYCbCrToRGB(nextToView);
     }
@@ -305,7 +305,71 @@ namespace vh {
 
         StdVideoH264SequenceParameterSet sps = {};
         sps.profile_idc = (StdVideoH264ProfileIdc)s.profile_idc;
-        sps.level_idc = (StdVideoH264LevelIdc)s.level_idc;
+        switch (s.level_idc)
+        {
+        case 0:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_1_0;
+            break;
+        case 11:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_1_1;
+            break;
+        case 12:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_1_2;
+            break;
+        case 13:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_1_3;
+            break;
+        case 20:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_2_0;
+            break;
+        case 21:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_2_1;
+            break;
+        case 22:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_2_2;
+            break;
+        case 30:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_3_0;
+            break;
+        case 31:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_3_1;
+            break;
+        case 32:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_3_2;
+            break;
+        case 40:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_4_0;
+            break;
+        case 41:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_4_1;
+            break;
+        case 42:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_4_2;
+            break;
+        case 50:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_5_0;
+            break;
+        case 51:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_5_1;
+            break;
+        case 52:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_5_2;
+            break;
+        case 60:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_6_0;
+            break;
+        case 61:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_6_1;
+            break;
+        case 62:
+            sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_6_2;
+            break;
+        default:
+            assert(0);
+            break;
+        }
+
+        //sps.level_idc = (StdVideoH264LevelIdc)s.level_idc;
         sps.seq_parameter_set_id = s.seq_parameter_set_id;
         sps.chroma_format_idc = (StdVideoH264ChromaFormatIdc)s.chroma_format_idc;
         sps.bit_depth_luma_minus8 = s.bit_depth_luma_minus8;
@@ -564,7 +628,7 @@ namespace vh {
             m_stdH264references[i].flags.is_non_existing = 0;
             m_stdH264references[i].FrameNum = 0;
             m_stdH264references[i].PicOrderCnt[0] = 0;
-            m_stdH264references[i].PicOrderCnt[1] = 1;
+            m_stdH264references[i].PicOrderCnt[1] = 0;
 
             m_h264slots[i] = {VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_DPB_SLOT_INFO_KHR};
             m_h264slots[i].pStdReferenceInfo = &m_stdH264references[i];
@@ -678,27 +742,6 @@ namespace vh {
             }
         }
 
-
-        m_referenceSlots[m_activeDecodePicture].slotIndex = -1;
-        m_stdH264references[m_activeDecodePicture].FrameNum = sliceHeader.frame_num;
-
-        VkVideoBeginCodingInfoKHR beginInfo = { VK_STRUCTURE_TYPE_VIDEO_BEGIN_CODING_INFO_KHR };
-        beginInfo.videoSession = m_videoSession;
-        beginInfo.videoSessionParameters = m_videoSessionParameters;
-        beginInfo.referenceSlotCount = m_activeReferenceSlots + 1;
-        beginInfo.pReferenceSlots = m_referenceSlots.data();
-
-        vkCmdBeginVideoCodingKHR(m_decodeCommandBuffer, &beginInfo);
-
-        if (m_resetPending) {
-            VkVideoCodingControlInfoKHR codingControlInfo = { VK_STRUCTURE_TYPE_VIDEO_CODING_CONTROL_INFO_KHR };
-            codingControlInfo.flags = VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR;
-
-            vkCmdControlVideoCodingKHR(m_decodeCommandBuffer, &codingControlInfo);
-
-            m_resetPending = false;
-        }
-
         int max_pic_order_cnt_lsb = 1 << (m_sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
         int pic_order_cnt_lsb = sliceHeader.pic_order_cnt_lsb;
 
@@ -730,6 +773,35 @@ namespace vh {
         int poc = pic_order_cnt_msb + pic_order_cnt_lsb; // poc = TopFieldOrderCount
         int gop = m_poc_cycle - 1;
 
+        m_referenceSlots[m_activeDecodePicture].slotIndex = -1;
+        m_stdH264references[m_activeDecodePicture].FrameNum = sliceHeader.frame_num;
+        m_stdH264references[m_activeDecodePicture].PicOrderCnt[0] = poc;
+        m_stdH264references[m_activeDecodePicture].PicOrderCnt[1] = poc;
+
+        VkVideoBeginCodingInfoKHR beginInfo = { VK_STRUCTURE_TYPE_VIDEO_BEGIN_CODING_INFO_KHR };
+        beginInfo.videoSession = m_videoSession;
+        beginInfo.videoSessionParameters = m_videoSessionParameters;
+        beginInfo.referenceSlotCount = m_activeReferenceSlots + 1;
+        beginInfo.pReferenceSlots = m_referenceSlots.data();
+
+
+        vkCmdBeginVideoCodingKHR(m_decodeCommandBuffer, &beginInfo);
+
+        if (m_resetPending) {
+            VkVideoCodingControlInfoKHR codingControlInfo = { VK_STRUCTURE_TYPE_VIDEO_CODING_CONTROL_INFO_KHR };
+            codingControlInfo.flags = VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR;
+
+            vkCmdControlVideoCodingKHR(m_decodeCommandBuffer, &codingControlInfo);
+
+            m_resetPending = false;
+        }
+
+
+        //std::cout << m_activeDecodePicture << ": " << poc << " (" << m_pictureResources[m_activeDecodePicture].imageViewBinding << ")" << std::endl;
+        //for (int i = 0; i < beginInfo.referenceSlotCount; ++i)
+        //{
+        //    std::cout << "  " << i << ": " << m_referenceSlots[i].slotIndex << ": " << m_referenceSlots[i].pPictureResource->imageViewBinding << std::endl;
+        //}
 
         uint32_t sliceOffset = 0;
 
@@ -802,7 +874,11 @@ namespace vh {
 
         vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, 1, &m_decodeCommandBuffer);
 
-        //std::cout << m_activeDecodePicture << ": " << gop << ", " << poc << " (" << m_stdH264references[m_activeDecodePicture].FrameNum << ")" << std::endl;
+        //std::cout << m_activeDecodePicture << ": " << poc << " (" << m_pictureResources[m_activeDecodePicture].imageViewBinding << ")" << std::endl;
+        //for (const auto& s : refSlots)
+        //{
+        //    std::cout << "  " << s.slotIndex << ": " << s.pPictureResource->imageViewBinding << std::endl;
+        //}
 
         if (m_gopPocs.size() <= m_activeDecodePicture)
         {
@@ -811,7 +887,7 @@ namespace vh {
         }
         m_gopPocs[m_activeDecodePicture] = (uint64_t)gop << 32 | poc;
         m_viewed[m_activeDecodePicture] = false;
-
+        //m_activeViewPicture = m_activeDecodePicture;
         if (decodeH264pictureInfo.flags.is_reference) {
             m_activeDecodePicture = (m_activeDecodePicture + 1) % m_pictureResources.size();
             m_activeReferenceSlots = std::min(m_activeReferenceSlots + 1, (uint32_t)m_referenceSlots.size() - 1);
