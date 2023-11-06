@@ -121,8 +121,8 @@ namespace h264
 
             m_pictureInfoFlags.IdrPicFlag = isI ? 1 : 0; // every I frame is an IDR frame
             m_pictureInfoFlags.is_reference = 1;
-            m_pictureInfoFlags.no_output_of_prior_pics_flag = 0;
             m_pictureInfoFlags.adaptive_ref_pic_marking_mode_flag = 0;
+            //m_pictureInfoFlags.no_output_of_prior_pics_flag = 0;
             m_pictureInfoFlags.no_output_of_prior_pics_flag = isI ? 1 : 0;
 
             m_stdPictureInfo.flags = m_pictureInfoFlags;
@@ -144,8 +144,8 @@ namespace h264
             m_referenceLists.RefPicList0[0] = 0;
 
             if (!isI) {
-                m_referenceLists.num_ref_idx_l0_active_minus1 = 1;
-                m_referenceLists.num_ref_idx_l1_active_minus1 = 0;
+                //m_referenceLists.num_ref_idx_l0_active_minus1 = 0;
+                //m_referenceLists.num_ref_idx_l1_active_minus1 = 0;
                 //m_referenceLists.refPicList0EntryCount = 1;
                 m_referenceLists.RefPicList0[0] = 1;
 

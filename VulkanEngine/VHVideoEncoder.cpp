@@ -558,12 +558,19 @@ namespace vh {
         refPicResource.codedExtent = { m_width, m_height };
         refPicResource.baseArrayLayer = 0;
 
+        const uint32_t MaxPicOrderCntLsb = 1 << (m_sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
         StdVideoEncodeH264ReferenceInfo dpbRefInfo = {};
+        dpbRefInfo.FrameNum = gopFrameCount;
+        dpbRefInfo.PicOrderCnt = (dpbRefInfo.FrameNum * 2) % MaxPicOrderCntLsb;;
+        dpbRefInfo.primary_pic_type = dpbRefInfo.FrameNum == 0 ? STD_VIDEO_H264_PICTURE_TYPE_IDR : STD_VIDEO_H264_PICTURE_TYPE_P;
         VkVideoEncodeH264DpbSlotInfoEXT dpbSlotInfo = { VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_DPB_SLOT_INFO_EXT };
         dpbSlotInfo.pNext = nullptr;
         dpbSlotInfo.pStdReferenceInfo = &dpbRefInfo;
 
         StdVideoEncodeH264ReferenceInfo refRefInfo = {};
+        refRefInfo.FrameNum = gopFrameCount - 1;
+        refRefInfo.PicOrderCnt = (refRefInfo.FrameNum * 2) % MaxPicOrderCntLsb;;
+        refRefInfo.primary_pic_type = refRefInfo.FrameNum == 0 ? STD_VIDEO_H264_PICTURE_TYPE_IDR : STD_VIDEO_H264_PICTURE_TYPE_P;
         VkVideoEncodeH264DpbSlotInfoEXT refSlotInfo = { VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_DPB_SLOT_INFO_EXT };
         refSlotInfo.pNext = nullptr;
         refSlotInfo.pStdReferenceInfo = &refRefInfo;
