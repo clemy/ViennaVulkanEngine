@@ -28,6 +28,7 @@ namespace vh {
         VkResult createVideoSession();
         VkResult allocateVideoSessionMemory();
         VkResult createVideoSessionParameters(uint32_t fps);
+		VkResult readBitstreamHeader();
         VkResult allocateOutputBitStream();
         VkResult allocateReferenceImages(uint32_t count);
         VkResult allocateIntermediateImages();
@@ -75,7 +76,7 @@ namespace vh {
 		VkQueryPool m_queryPool;
 		VkBuffer m_bitStreamBuffer;
 		VmaAllocation m_bitStreamBufferAllocation;
-		h264::BitStream m_bitStreamHeader;
+		std::vector<char> m_bitStreamHeader;
 		bool m_bitStreamHeaderPending;
 		
 		char* m_bitStreamData;

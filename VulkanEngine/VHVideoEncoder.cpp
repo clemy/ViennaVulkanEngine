@@ -42,30 +42,7 @@ namespace vh {
         VHCHECKRESULT(createVideoSession());
         VHCHECKRESULT(allocateVideoSessionMemory());
         VHCHECKRESULT(createVideoSessionParameters(fps));
-
-        unsigned char data[10240];
-        size_t datalen = 10240;
-        memset(data, 0, datalen);
-        VkVideoEncodeH264SessionParametersGetInfoEXT h264getInfo = {};
-        h264getInfo.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_SESSION_PARAMETERS_GET_INFO_EXT;
-        h264getInfo.stdSPSId = 0;
-        h264getInfo.stdPPSId = 0;
-        h264getInfo.writeStdPPS = VK_TRUE;
-        h264getInfo.writeStdSPS = VK_TRUE;
-        VkVideoEncodeSessionParametersGetInfoKHR getInfo = {};
-        getInfo.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_SESSION_PARAMETERS_GET_INFO_KHR;
-        getInfo.pNext = &h264getInfo;
-        getInfo.videoSessionParameters = m_videoSessionParameters;
-
-        VkVideoEncodeH264SessionParametersFeedbackInfoEXT h264feedback = {};
-        h264feedback.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_SESSION_PARAMETERS_FEEDBACK_INFO_EXT;
-        VkVideoEncodeSessionParametersFeedbackInfoKHR feedback = {};
-        feedback.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_SESSION_PARAMETERS_FEEDBACK_INFO_KHR;
-        feedback.pNext = &h264feedback;
-        VkResult ret = vkGetEncodedVideoSessionParametersKHR(m_device, &getInfo, &feedback, &datalen, data);
-
-
-
+        VHCHECKRESULT(readBitstreamHeader());
         VHCHECKRESULT(allocateOutputBitStream());
         VHCHECKRESULT(allocateReferenceImages(2));
         VHCHECKRESULT(allocateIntermediateImages());
@@ -80,11 +57,6 @@ namespace vh {
         VHCHECKRESULT(initRateControl(cmdBuffer, 20));
         VHCHECKRESULT(transitionImagesInitial(cmdBuffer));
         VHCHECKRESULT(vhCmdEndSingleTimeCommands(m_device, m_encodeQueue, m_encodeCommandPool, cmdBuffer));
-
-
-        h264::encodeSps(m_sps, m_bitStreamHeader);
-        h264::encodePps(m_pps, m_bitStreamHeader);
-        m_bitStreamHeaderPending = true;
 
         m_frameCount = 0;
         m_initialized = true;
@@ -107,7 +79,7 @@ namespace vh {
             return VK_NOT_READY;
         }
         if (m_bitStreamHeaderPending) {
-            data = reinterpret_cast<const char*>(m_bitStreamHeader.data());
+            data = m_bitStreamHeader.data();
             size = m_bitStreamHeader.size();
             m_bitStreamHeaderPending = false;
             return VK_SUCCESS;
@@ -229,6 +201,33 @@ namespace vh {
         sessionParametersCreateInfo.videoSession = m_videoSession;
 
         return vkCreateVideoSessionParametersKHR(m_device, &sessionParametersCreateInfo, nullptr, &m_videoSessionParameters);
+    }
+
+    VkResult VHVideoEncoder::readBitstreamHeader()
+    {
+        VkVideoEncodeH264SessionParametersGetInfoEXT h264getInfo = {};
+        h264getInfo.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_SESSION_PARAMETERS_GET_INFO_EXT;
+        h264getInfo.stdSPSId = 0;
+        h264getInfo.stdPPSId = 0;
+        h264getInfo.writeStdPPS = VK_TRUE;
+        h264getInfo.writeStdSPS = VK_TRUE;
+        VkVideoEncodeSessionParametersGetInfoKHR getInfo = {};
+        getInfo.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_SESSION_PARAMETERS_GET_INFO_KHR;
+        getInfo.pNext = &h264getInfo;
+        getInfo.videoSessionParameters = m_videoSessionParameters;
+
+        VkVideoEncodeH264SessionParametersFeedbackInfoEXT h264feedback = {};
+        h264feedback.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_SESSION_PARAMETERS_FEEDBACK_INFO_EXT;
+        VkVideoEncodeSessionParametersFeedbackInfoKHR feedback = {};
+        feedback.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_SESSION_PARAMETERS_FEEDBACK_INFO_KHR;
+        feedback.pNext = &h264feedback;
+        size_t datalen = 1024;
+        VHCHECKRESULT(vkGetEncodedVideoSessionParametersKHR(m_device, &getInfo, nullptr, &datalen, nullptr));
+        m_bitStreamHeader.resize(datalen);
+        VHCHECKRESULT(vkGetEncodedVideoSessionParametersKHR(m_device, &getInfo, &feedback, &datalen, m_bitStreamHeader.data()));
+        m_bitStreamHeader.resize(datalen);
+        m_bitStreamHeaderPending = true;
+        return VK_SUCCESS;
     }
 
     VkResult VHVideoEncoder::allocateOutputBitStream()
