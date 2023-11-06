@@ -129,7 +129,7 @@ namespace h264
             m_stdPictureInfo.seq_parameter_set_id = 0;
             m_stdPictureInfo.pic_parameter_set_id = pps.pic_parameter_set_id;
             m_stdPictureInfo.idr_pic_id = 0;
-            m_stdPictureInfo.primary_pic_type = isI ? STD_VIDEO_H264_PICTURE_TYPE_I : STD_VIDEO_H264_PICTURE_TYPE_P;
+            m_stdPictureInfo.primary_pic_type = isI ? STD_VIDEO_H264_PICTURE_TYPE_IDR : STD_VIDEO_H264_PICTURE_TYPE_P;
             //m_stdPictureInfo.temporal_id = 1;
 
             // frame_num is incremented for each reference frame transmitted.

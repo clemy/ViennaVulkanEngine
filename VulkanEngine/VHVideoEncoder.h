@@ -62,6 +62,7 @@ namespace vh {
 		VkVideoSessionParametersKHR m_videoSessionParameters;
 		VkVideoEncodeH264ProfileInfoEXT m_encodeH264ProfileInfoExt;
 		VkVideoProfileInfoKHR m_videoProfile;
+		VkVideoProfileListInfoKHR m_videoProfileList;
 
 		VkDescriptorSetLayout m_computeDescriptorSetLayout;
 		VkPipelineLayout m_computePipelineLayout;

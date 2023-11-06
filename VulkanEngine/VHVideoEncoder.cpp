@@ -138,6 +138,10 @@ namespace vh {
         m_videoProfile.lumaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR;
         m_videoProfile.pNext = &m_encodeH264ProfileInfoExt;
 
+        m_videoProfileList = { VK_STRUCTURE_TYPE_VIDEO_PROFILE_LIST_INFO_KHR };
+        m_videoProfileList.profileCount = 1;
+        m_videoProfileList.pProfiles = &m_videoProfile;
+
         static const VkExtensionProperties h264StdExtensionVersion = { VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_EXTENSION_NAME, VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_SPEC_VERSION };
         VkVideoSessionCreateInfoKHR createInfo = { VK_STRUCTURE_TYPE_VIDEO_SESSION_CREATE_INFO_KHR };
         createInfo.pVideoProfile = &m_videoProfile;
@@ -231,7 +235,7 @@ namespace vh {
     {
         VHCHECKRESULT(vhBufCreateBuffer(m_allocator, 4 * 1024 * 1024,
             VK_BUFFER_USAGE_VIDEO_ENCODE_DST_BIT_KHR, VMA_MEMORY_USAGE_GPU_TO_CPU,
-            &m_bitStreamBuffer, &m_bitStreamBufferAllocation));
+            &m_bitStreamBuffer, &m_bitStreamBufferAllocation, &m_videoProfileList));
         VHCHECKRESULT(vmaMapMemory(m_allocator, m_bitStreamBufferAllocation, reinterpret_cast<void**>(&m_bitStreamData)));
 
         return VK_SUCCESS;
@@ -245,7 +249,7 @@ namespace vh {
         for (uint32_t i = 0; i < count; i++) {
             VkImageCreateInfo tmpImgCreateInfo;
             tmpImgCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-            tmpImgCreateInfo.pNext = &m_videoProfile;
+            tmpImgCreateInfo.pNext = &m_videoProfileList;
             tmpImgCreateInfo.imageType = VK_IMAGE_TYPE_2D;
             tmpImgCreateInfo.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
             tmpImgCreateInfo.extent = { m_width, m_height, 1 };
@@ -254,7 +258,7 @@ namespace vh {
             tmpImgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             tmpImgCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
             tmpImgCreateInfo.usage = VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR; // DPB ONLY
-            tmpImgCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT; // VK_SHARING_MODE_EXCLUSIVE here makes it not check for queueFamily
+            tmpImgCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE here makes it not check for queueFamily
             tmpImgCreateInfo.queueFamilyIndexCount = 1;
             tmpImgCreateInfo.pQueueFamilyIndices = &m_encodeQueueFamily;
             tmpImgCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -272,7 +276,7 @@ namespace vh {
         uint32_t queueFamilies[] = {m_computeQueueFamily, m_encodeQueueFamily };
         VkImageCreateInfo tmpImgCreateInfo;
         tmpImgCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        tmpImgCreateInfo.pNext = &m_videoProfile;
+        tmpImgCreateInfo.pNext = &m_videoProfileList;
         tmpImgCreateInfo.imageType = VK_IMAGE_TYPE_2D;
         tmpImgCreateInfo.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
         tmpImgCreateInfo.extent = { m_width, m_height, 1 };
