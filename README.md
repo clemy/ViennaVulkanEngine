@@ -129,7 +129,7 @@ The only graphics driver supporting those extensions at the moment is the NVIDIA
 The code is tested with
 - Windows 11
 - NVIDIA RTX 3070
-- Vulkan SDK 1.3.243.0
-- NVIDIA driver version 531.54 (Vulkan Beta Driver)
+- Vulkan SDK 1.3.268.0
+- NVIDIA driver version 537.72 (Vulkan Beta Driver)
 
 After enabling `Write Frames` in the GUI the output is written to the file `hwenc.264` (in the current directory). It can be played with VLC or ffplay.
