@@ -39,10 +39,10 @@ namespace vh {
         m_width = width & ~1;
         m_height = height & ~1;
 
-        VHCHECKRESULT(createVideoSession());
+        VHCHECKRESULT(createVideoSessionH265());
         VHCHECKRESULT(allocateVideoSessionMemory());
-        VHCHECKRESULT(createVideoSessionParameters(fps));
-        VHCHECKRESULT(readBitstreamHeader());
+        VHCHECKRESULT(createVideoSessionParametersH265(fps));
+        VHCHECKRESULT(readBitstreamHeaderH265());
         VHCHECKRESULT(allocateOutputBitStream());
         VHCHECKRESULT(allocateReferenceImages(2));
         VHCHECKRESULT(allocateIntermediateImages());
@@ -141,6 +141,49 @@ namespace vh {
         return vkCreateVideoSessionKHR(m_device, &createInfo, nullptr, &m_videoSession);
     }
 
+    VkResult VHVideoEncoder::createVideoSessionH265()
+    {
+        m_encodeH265ProfileInfoExt = { VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_PROFILE_INFO_EXT };
+        m_encodeH265ProfileInfoExt.stdProfileIdc = STD_VIDEO_H265_PROFILE_IDC_MAIN;
+
+        m_videoProfile = { VK_STRUCTURE_TYPE_VIDEO_PROFILE_INFO_KHR };
+        m_videoProfile.videoCodecOperation = VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_EXT;
+        m_videoProfile.chromaSubsampling = VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR;
+        m_videoProfile.chromaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR;
+        m_videoProfile.lumaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR;
+        m_videoProfile.pNext = &m_encodeH265ProfileInfoExt;
+
+        m_videoProfileList = { VK_STRUCTURE_TYPE_VIDEO_PROFILE_LIST_INFO_KHR };
+        m_videoProfileList.profileCount = 1;
+        m_videoProfileList.pProfiles = &m_videoProfile;
+
+        static const VkExtensionProperties h265StdExtensionVersion = { VK_STD_VULKAN_VIDEO_CODEC_H265_ENCODE_EXTENSION_NAME, VK_STD_VULKAN_VIDEO_CODEC_H265_ENCODE_SPEC_VERSION };
+        VkVideoSessionCreateInfoKHR createInfo = { VK_STRUCTURE_TYPE_VIDEO_SESSION_CREATE_INFO_KHR };
+        createInfo.pVideoProfile = &m_videoProfile;
+        createInfo.queueFamilyIndex = m_encodeQueueFamily;
+        createInfo.pictureFormat = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+        createInfo.maxCodedExtent = { m_width, m_height };
+        createInfo.maxDpbSlots = 16;
+        createInfo.maxActiveReferencePictures = 16;
+        createInfo.referencePictureFormat = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+        createInfo.pStdHeaderVersion = &h265StdExtensionVersion;
+
+        VkVideoEncodeH265CapabilitiesEXT h265capabilities = {};
+        h265capabilities.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_CAPABILITIES_EXT;
+
+        VkVideoEncodeCapabilitiesKHR encodeCapabilities = {};
+        encodeCapabilities.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_CAPABILITIES_KHR;
+        encodeCapabilities.pNext = &h265capabilities;
+
+        VkVideoCapabilitiesKHR capabilities = {};
+        capabilities.sType = VK_STRUCTURE_TYPE_VIDEO_CAPABILITIES_KHR;
+        capabilities.pNext = &encodeCapabilities;
+
+        VkResult ret = vkGetPhysicalDeviceVideoCapabilitiesKHR(m_physicalDevice, &m_videoProfile, &capabilities);
+
+        return vkCreateVideoSessionKHR(m_device, &createInfo, nullptr, &m_videoSession);
+    }
+
     VkResult VHVideoEncoder::allocateVideoSessionMemory()
     {
         uint32_t videoSessionMemoryRequirementsCount = 0;
@@ -203,6 +246,36 @@ namespace vh {
         return vkCreateVideoSessionParametersKHR(m_device, &sessionParametersCreateInfo, nullptr, &m_videoSessionParameters);
     }
 
+    VkResult VHVideoEncoder::createVideoSessionParametersH265(uint32_t fps)
+    {
+        m_vpsH265 = h264::getStdVideoH265VideoParameterSet(fps);
+        m_spsH265 = h264::getStdVideoH265SequenceParameterSet(m_width, m_height, nullptr);
+        m_ppsH265 = h264::getStdVideoH265PictureParameterSet();
+
+        VkVideoEncodeH265SessionParametersAddInfoEXT encodeH265SessionParametersAddInfo = { VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_ADD_INFO_EXT };
+        encodeH265SessionParametersAddInfo.pNext = nullptr;
+        encodeH265SessionParametersAddInfo.stdVPSCount = 1;
+        encodeH265SessionParametersAddInfo.pStdVPSs = &m_vpsH265;
+        encodeH265SessionParametersAddInfo.stdSPSCount = 0;
+        encodeH265SessionParametersAddInfo.pStdSPSs = &m_spsH265;
+        encodeH265SessionParametersAddInfo.stdPPSCount = 0;
+        encodeH265SessionParametersAddInfo.pStdPPSs = &m_ppsH265;
+
+        VkVideoEncodeH265SessionParametersCreateInfoEXT encodeH265SessionParametersCreateInfo = { VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_CREATE_INFO_EXT };
+        encodeH265SessionParametersCreateInfo.pNext = nullptr;
+        encodeH265SessionParametersCreateInfo.maxStdVPSCount = 1;
+        encodeH265SessionParametersCreateInfo.maxStdSPSCount = 1;
+        encodeH265SessionParametersCreateInfo.maxStdPPSCount = 1;
+        encodeH265SessionParametersCreateInfo.pParametersAddInfo = &encodeH265SessionParametersAddInfo;
+
+        VkVideoSessionParametersCreateInfoKHR sessionParametersCreateInfo = { VK_STRUCTURE_TYPE_VIDEO_SESSION_PARAMETERS_CREATE_INFO_KHR };
+        sessionParametersCreateInfo.pNext = &encodeH265SessionParametersCreateInfo;
+        sessionParametersCreateInfo.videoSessionParametersTemplate = nullptr;
+        sessionParametersCreateInfo.videoSession = m_videoSession;
+
+        return vkCreateVideoSessionParametersKHR(m_device, &sessionParametersCreateInfo, nullptr, &m_videoSessionParameters);
+    }
+
     VkResult VHVideoEncoder::readBitstreamHeader()
     {
         VkVideoEncodeH264SessionParametersGetInfoEXT h264getInfo = {};
@@ -223,6 +296,35 @@ namespace vh {
         feedback.pNext = &h264feedback;
         size_t datalen = 1024;
         VHCHECKRESULT(vkGetEncodedVideoSessionParametersKHR(m_device, &getInfo, nullptr, &datalen, nullptr));
+        m_bitStreamHeader.resize(datalen);
+        VHCHECKRESULT(vkGetEncodedVideoSessionParametersKHR(m_device, &getInfo, &feedback, &datalen, m_bitStreamHeader.data()));
+        m_bitStreamHeader.resize(datalen);
+        m_bitStreamHeaderPending = true;
+        return VK_SUCCESS;
+    }
+
+    VkResult VHVideoEncoder::readBitstreamHeaderH265()
+    {
+        VkVideoEncodeH265SessionParametersGetInfoEXT h265getInfo = {};
+        h265getInfo.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_GET_INFO_EXT;
+        h265getInfo.stdVPSId = 0;
+        h265getInfo.stdSPSId = 0;
+        h265getInfo.stdPPSId = 0;
+        h265getInfo.writeStdVPS = VK_TRUE;
+        h265getInfo.writeStdPPS = VK_FALSE;
+        h265getInfo.writeStdSPS = VK_FALSE;
+        VkVideoEncodeSessionParametersGetInfoKHR getInfo = {};
+        getInfo.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_SESSION_PARAMETERS_GET_INFO_KHR;
+        getInfo.pNext = &h265getInfo;
+        getInfo.videoSessionParameters = m_videoSessionParameters;
+
+        VkVideoEncodeH265SessionParametersFeedbackInfoEXT h265feedback = {};
+        h265feedback.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_FEEDBACK_INFO_EXT;
+        VkVideoEncodeSessionParametersFeedbackInfoKHR feedback = {};
+        feedback.sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_SESSION_PARAMETERS_FEEDBACK_INFO_KHR;
+        feedback.pNext = &h265feedback;
+        size_t datalen = 102400;
+        //VHCHECKRESULT(vkGetEncodedVideoSessionParametersKHR(m_device, &getInfo, nullptr, &datalen, nullptr));
         m_bitStreamHeader.resize(datalen);
         VHCHECKRESULT(vkGetEncodedVideoSessionParametersKHR(m_device, &getInfo, &feedback, &datalen, m_bitStreamHeader.data()));
         m_bitStreamHeader.resize(datalen);

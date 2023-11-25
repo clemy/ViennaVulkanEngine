@@ -26,9 +26,12 @@ namespace vh {
 	private:
 #ifdef VULKAN_VIDEO_ENCODE
         VkResult createVideoSession();
+        VkResult createVideoSessionH265();
         VkResult allocateVideoSessionMemory();
         VkResult createVideoSessionParameters(uint32_t fps);
+        VkResult createVideoSessionParametersH265(uint32_t fps);
 		VkResult readBitstreamHeader();
+		VkResult readBitstreamHeaderH265();
         VkResult allocateOutputBitStream();
         VkResult allocateReferenceImages(uint32_t count);
         VkResult allocateIntermediateImages();
@@ -64,6 +67,11 @@ namespace vh {
 		VkVideoEncodeH264ProfileInfoEXT m_encodeH264ProfileInfoExt;
 		VkVideoProfileInfoKHR m_videoProfile;
 		VkVideoProfileListInfoKHR m_videoProfileList;
+
+		StdVideoH265VideoParameterSet m_vpsH265;
+		StdVideoH265SequenceParameterSet m_spsH265;
+		StdVideoH265PictureParameterSet m_ppsH265;
+		VkVideoEncodeH265ProfileInfoEXT m_encodeH265ProfileInfoExt;
 
 		VkDescriptorSetLayout m_computeDescriptorSetLayout;
 		VkPipelineLayout m_computePipelineLayout;
