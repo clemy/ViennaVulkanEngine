@@ -706,6 +706,7 @@ namespace vh {
             m_activeReferenceSlots = 0;
             //m_gopPocs.clear();
             //m_viewed.clear();
+            m_poc_cycle++;
         }
 
         h264::SliceHeader sliceHeader = {};
@@ -747,7 +748,7 @@ namespace vh {
 
         if (pic_order_cnt_lsb == 0)
         {
-            m_poc_cycle++;
+            //m_poc_cycle++;
         }
 
         // Rec. ITU-T H.264 (08/2021) page 115
