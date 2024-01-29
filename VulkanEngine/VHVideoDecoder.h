@@ -98,10 +98,17 @@ namespace vh {
 			VkImage m_targetImage;
 			VkImageView m_targetImageView;
 
+			VkBuffer m_bitStreamBuffer;
+			VmaAllocation m_bitStreamBufferAllocation;
+			void* m_bitStreamData;
+			size_t m_bufferSize;
+
 			VkCommandBuffer m_computeCommandBuffer;
 
 			std::vector<uint8_t> m_data;
 			uint8_t* m_nextData;
+
+			VkFence m_decodeFinishedFence;
 
 			friend class VHVideoDecoder;
 		};

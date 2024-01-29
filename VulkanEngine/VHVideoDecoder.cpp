@@ -199,6 +199,15 @@ namespace vh {
         VHCHECKRESULT(createVideoSessionParameters());
         VHCHECKRESULT(allocateReferenceImages(m_sps.max_num_ref_frames + 1));
 
+        m_computeCommandBuffer = VK_NULL_HANDLE;
+        m_decodeCommandBuffer = VK_NULL_HANDLE;
+        m_bufferSize = 0;
+
+        VkFenceCreateInfo fenceInfo = {};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        VHCHECKRESULT(vkCreateFence(m_decoder->m_device, &fenceInfo, nullptr, &m_decodeFinishedFence));
+
         return VK_SUCCESS;
     }
 
@@ -213,12 +222,20 @@ namespace vh {
         const double TIME_BETWEEN_FRAMES = 1.0 / 30;
         m_nextFrameTime -= dt;
         if (m_nextFrameTime <= 0) {
-            m_nextFrameTime += TIME_BETWEEN_FRAMES;
 
             while (m_activeDecodePicture >= m_viewed.size() || m_viewed[m_activeDecodePicture])
             {
+                if (vkWaitForFences(m_decoder->m_device, 1, &m_decodeFinishedFence, VK_TRUE, 0) == VK_TIMEOUT) {
+                    // decode frame later if previous frame is still decoding or previous image still transfering
+                    return;
+                }
                 decodeFrame();
             }
+            if (vkWaitForFences(m_decoder->m_device, 1, &m_decodeFinishedFence, VK_TRUE, 0) == VK_TIMEOUT) {
+                // transfer image later if previous frame/image is still decoding/transfering
+                return;
+            }
+            m_nextFrameTime += TIME_BETWEEN_FRAMES;
             transferImage();
         }
     }
@@ -274,14 +291,14 @@ namespace vh {
 
     void VHVideoDecoder::Session::deinit()
     {
-        //if (m_running) {
-    //    const char* data;
-    //    size_t size;
-    //    getOutputVideoPacket(data, size);
-            //vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_graphicsCommandPool, 1, &m_computeCommandBuffer);
-            //vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, 1, &m_decodeCommandBuffer);
-        //}
-
+        vkWaitForFences(m_decoder->m_device, 1, &m_decodeFinishedFence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+        vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_graphicsCommandPool, 1, &m_computeCommandBuffer);
+        vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, 1, &m_decodeCommandBuffer);
+        vkDestroyFence(m_decoder->m_device, m_decodeFinishedFence, nullptr);
+        if (m_bufferSize > 0) {
+            vmaUnmapMemory(m_decoder->m_allocator, m_bitStreamBufferAllocation);
+            vmaDestroyBuffer(m_decoder->m_allocator, m_bitStreamBuffer, m_bitStreamBufferAllocation);
+        }
         vkDestroyVideoSessionParametersKHR(m_decoder->m_device, m_videoSessionParameters, nullptr);
         for (uint32_t i = 0; i < m_dpbImages.size(); i++) {
             vkDestroyImageView(m_decoder->m_device, m_dpbImageViews[i], nullptr);
@@ -689,7 +706,7 @@ namespace vh {
     }
 
     VkResult VHVideoDecoder::Session::decodeFrame()
-    {
+    {        
         uint8_t* data;
         size_t length;
         h264::NALHeader nal = {};
@@ -712,21 +729,25 @@ namespace vh {
         h264::SliceHeader sliceHeader = {};
         h264::read_slice_header(&sliceHeader, &nal, &m_h264pps, &m_h264sps, &bitstream);
 
-        size_t bufferSize = h264ps::AlignSize(length, m_videoCapabilities.minBitstreamBufferSizeAlignment);
+        size_t bufferSizeNeeded = h264ps::AlignSize(length, m_videoCapabilities.minBitstreamBufferSizeAlignment);
 
-        VkBuffer m_bitStreamBuffer;
-        VmaAllocation m_bitStreamBufferAllocation;
-        void* m_bitStreamData;
+        if (m_bufferSize < bufferSizeNeeded) {
+            if (m_bufferSize > 0) {
+                vmaUnmapMemory(m_decoder->m_allocator, m_bitStreamBufferAllocation);
+                vmaDestroyBuffer(m_decoder->m_allocator, m_bitStreamBuffer, m_bitStreamBufferAllocation);
+            }
 
-        VHCHECKRESULT(vhBufCreateBuffer(m_decoder->m_allocator, bufferSize,
-            VK_BUFFER_USAGE_VIDEO_DECODE_SRC_BIT_KHR, VMA_MEMORY_USAGE_CPU_TO_GPU, // TODO: maybe use VMA_MEMORY_USAGE_CPU_COPY
-            &m_bitStreamBuffer, &m_bitStreamBufferAllocation, &m_videoProfileList));
-        VHCHECKRESULT(vmaMapMemory(m_decoder->m_allocator, m_bitStreamBufferAllocation, &m_bitStreamData));
+            m_bufferSize = bufferSizeNeeded;
+            VHCHECKRESULT(vhBufCreateBuffer(m_decoder->m_allocator, m_bufferSize,
+                VK_BUFFER_USAGE_VIDEO_DECODE_SRC_BIT_KHR, VMA_MEMORY_USAGE_CPU_TO_GPU, // TODO: maybe use VMA_MEMORY_USAGE_CPU_COPY
+                &m_bitStreamBuffer, &m_bitStreamBufferAllocation, &m_videoProfileList));
+            VHCHECKRESULT(vmaMapMemory(m_decoder->m_allocator, m_bitStreamBufferAllocation, &m_bitStreamData));
+        }
         memcpy(m_bitStreamData, data, length);
 
-        vmaFlushAllocation(m_decoder->m_allocator, m_bitStreamBufferAllocation, 0, VK_WHOLE_SIZE);
+        vmaFlushAllocation(m_decoder->m_allocator, m_bitStreamBufferAllocation, 0, bufferSizeNeeded);
 
-
+        vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, 1, &m_decodeCommandBuffer);
         VHCHECKRESULT(vhCmdCreateCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1, &m_decodeCommandBuffer));
         VHCHECKRESULT(vhCmdBeginCommandBuffer(m_decoder->m_device, m_decodeCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT));
 
@@ -743,6 +764,7 @@ namespace vh {
             }
         }
 
+        // Source: adapted from https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/wiVideo.cpp
         int max_pic_order_cnt_lsb = 1 << (m_sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
         int pic_order_cnt_lsb = sliceHeader.pic_order_cnt_lsb;
 
@@ -773,6 +795,7 @@ namespace vh {
         // https://www.vcodex.com/h264avc-picture-management/
         int poc = pic_order_cnt_msb + pic_order_cnt_lsb; // poc = TopFieldOrderCount
         int gop = m_poc_cycle - 1;
+        // End Source: adapted from https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/wiVideo.cpp
 
         m_referenceSlots[m_activeDecodePicture].slotIndex = -1;
         m_stdH264references[m_activeDecodePicture].FrameNum = sliceHeader.frame_num;
@@ -785,7 +808,6 @@ namespace vh {
         beginInfo.referenceSlotCount = m_activeReferenceSlots + 1;
         beginInfo.pReferenceSlots = m_referenceSlots.data();
 
-
         vkCmdBeginVideoCodingKHR(m_decodeCommandBuffer, &beginInfo);
 
         if (m_resetPending) {
@@ -796,13 +818,6 @@ namespace vh {
 
             m_resetPending = false;
         }
-
-
-        //std::cout << m_activeDecodePicture << ": " << poc << " (" << m_pictureResources[m_activeDecodePicture].imageViewBinding << ")" << std::endl;
-        //for (int i = 0; i < beginInfo.referenceSlotCount; ++i)
-        //{
-        //    std::cout << "  " << i << ": " << m_referenceSlots[i].slotIndex << ": " << m_referenceSlots[i].pPictureResource->imageViewBinding << std::endl;
-        //}
 
         uint32_t sliceOffset = 0;
 
@@ -834,52 +849,19 @@ namespace vh {
         decodeInfo.pNext = &h264decodeInfo;
         decodeInfo.srcBuffer = m_bitStreamBuffer;
         decodeInfo.srcBufferOffset = 0;
-        decodeInfo.srcBufferRange = bufferSize;
+        decodeInfo.srcBufferRange = bufferSizeNeeded;
         decodeInfo.dstPictureResource = m_pictureResources[m_activeDecodePicture];
         decodeInfo.pSetupReferenceSlot = &m_referenceSlots[m_activeDecodePicture];
-        decodeInfo.referenceSlotCount = refSlots.size();
+        decodeInfo.referenceSlotCount = (uint32_t)refSlots.size();
         decodeInfo.pReferenceSlots = refSlots.size() ? refSlots.data() : nullptr;
 
-
         vkCmdDecodeVideoKHR(m_decodeCommandBuffer, &decodeInfo);
-
-
 
         VkVideoEndCodingInfoKHR encodeEndInfo = { VK_STRUCTURE_TYPE_VIDEO_END_CODING_INFO_KHR };
         vkCmdEndVideoCodingKHR(m_decodeCommandBuffer, &encodeEndInfo);
 
-        //VHCHECKRESULT(vhBufTransitionImageLayout(m_device, m_decodeQueue, m_decodeCommandBuffer,
-        //    m_dpbImages[0], VK_FORMAT_R8G8_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT, 1, 1,
-        //    VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
-
-
         VHCHECKRESULT(vkEndCommandBuffer(m_decodeCommandBuffer));
-        VHCHECKRESULT(vhCmdSubmitCommandBuffer(m_decoder->m_device, m_decoder->m_decodeQueue, m_decodeCommandBuffer, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE));
-
-
-        VHCHECKRESULT(vkQueueWaitIdle(m_decoder->m_decodeQueue)); // TODO: replace with better synchronization!
-
-        //uint8_t* dataImage = new uint8_t[m_width * m_height];
-        //VkResult ret = vhBufCopyImageToHost(m_device, m_allocator, m_decodeQueue, m_decodeCommandPool,
-        //    m_dpbImages[0], VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_ASPECT_PLANE_0_BIT, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR,
-        //    dataImage, m_width, m_height, m_width * m_height);
-
-        //VHCHECKRESULT(ret);
-
-        vmaUnmapMemory(m_decoder->m_allocator, m_bitStreamBufferAllocation);
-        vmaDestroyBuffer(m_decoder->m_allocator, m_bitStreamBuffer, m_bitStreamBufferAllocation);
-
-        //std::string name("../../out.png");
-        //stbi_write_png(name.c_str(), m_width, m_height, 1, dataImage, 1 * m_width);
-        //delete[] dataImage;
-
-        vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_decodeCommandPool, 1, &m_decodeCommandBuffer);
-
-        //std::cout << m_activeDecodePicture << ": " << poc << " (" << m_pictureResources[m_activeDecodePicture].imageViewBinding << ")" << std::endl;
-        //for (const auto& s : refSlots)
-        //{
-        //    std::cout << "  " << s.slotIndex << ": " << s.pPictureResource->imageViewBinding << std::endl;
-        //}
+        VHCHECKRESULT(vhCmdSubmitCommandBuffer(m_decoder->m_device, m_decoder->m_decodeQueue, m_decodeCommandBuffer, VK_NULL_HANDLE, VK_NULL_HANDLE, m_decodeFinishedFence));
 
         if (m_gopPocs.size() <= m_activeDecodePicture)
         {
@@ -888,18 +870,18 @@ namespace vh {
         }
         m_gopPocs[m_activeDecodePicture] = (uint64_t)gop << 32 | poc;
         m_viewed[m_activeDecodePicture] = false;
-        //m_activeViewPicture = m_activeDecodePicture;
         if (decodeH264pictureInfo.flags.is_reference) {
             m_activeDecodePicture = (m_activeDecodePicture + 1) % m_pictureResources.size();
             m_activeReferenceSlots = std::min(m_activeReferenceSlots + 1, (uint32_t)m_referenceSlots.size() - 1);
         }
-
+        
         return VK_SUCCESS;
     }
 
     VkResult VHVideoDecoder::Session::convertYCbCrToRGB(uint32_t currentImageIx)
     {
         // begin command buffer for compute shader
+        vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_graphicsCommandPool, 1, &m_computeCommandBuffer);
         VHCHECKRESULT(vhCmdCreateCommandBuffers(m_decoder->m_device, m_decoder->m_graphicsCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1, &m_computeCommandBuffer));
         VHCHECKRESULT(vhCmdBeginCommandBuffer(m_decoder->m_device, m_computeCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT));
 
@@ -925,11 +907,7 @@ namespace vh {
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR));
 
         VHCHECKRESULT(vkEndCommandBuffer(m_computeCommandBuffer));
-        VHCHECKRESULT(vhCmdSubmitCommandBuffer(m_decoder->m_device, m_decoder->m_graphicsQueue, m_computeCommandBuffer, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE));
-
-        VHCHECKRESULT(vkQueueWaitIdle(m_decoder->m_graphicsQueue)); // TODO: replace with better synchronization!
-
-        vkFreeCommandBuffers(m_decoder->m_device, m_decoder->m_graphicsCommandPool, 1, &m_computeCommandBuffer);
+        VHCHECKRESULT(vhCmdSubmitCommandBuffer(m_decoder->m_device, m_decoder->m_graphicsQueue, m_computeCommandBuffer, VK_NULL_HANDLE, VK_NULL_HANDLE, m_decodeFinishedFence));
 
         return VK_SUCCESS;
     }

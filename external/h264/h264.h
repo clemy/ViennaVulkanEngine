@@ -1,3 +1,7 @@
+// Source: https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/Utility/h264.h
+// Copyright (c) 2024 Turánszki János
+// License: MIT license https://github.com/turanszkij/WickedEngine/blob/master/LICENSE.txt
+
 #ifndef H264_H
 #define H264_H
 // Minimal H264 video parser
