@@ -12,6 +12,5 @@ newmtl cube
   Ks 0.0000 0.0000 0.0000
   Ke 0.0000 0.0000 0.0000
   map_Kd video.h264
-  map_bump bump.png
-  map_Kn normal.png
+
 

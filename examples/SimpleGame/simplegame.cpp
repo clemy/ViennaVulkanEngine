@@ -6,6 +6,7 @@
 */
 
 
+#include <format>
 #include "VEInclude.h"
 #include "irrKlang.h"
 
@@ -47,31 +48,33 @@ namespace ve {
 			VECHECKPOINTER(pE4 = (VEEntity*)getSceneManagerPointer()->getSceneNode("The Plane/plane_t_n_s.obj/plane/Entity_0"));
 			pE4->setParam(glm::vec4(1000.0f, 1000.0f, 0.0f, 0.0f));
 
-			VESceneNode* e1, * eParent;
-			eParent = getSceneManagerPointer()->createSceneNode("The Cube Parent", pScene, glm::mat4(1.0));
-			VECHECKPOINTER(e1 = getSceneManagerPointer()->loadModel("The Cube0", "../../media/models/test/crate0", "cube.obj"));
-			eParent->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(-10.0f, 0.5f, 10.0f)));
-			eParent->addChild(e1);
+			{
+				VESceneNode* eV, * eParentVideo;
+				eParentVideo = getSceneManagerPointer()->createSceneNode("The VideoCube Parent", pScene, glm::mat4(1.0));
+				VECHECKPOINTER(eV = getSceneManagerPointer()->loadModel("The VideoCubeVideo", "../../media/models/video/crateVideo", "cube.obj"));
+				eParentVideo->multiplyTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1.6f, 1.2f, 1.6f)));
+				eParentVideo->multiplyTransform(glm::rotate(glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)));
+				eParentVideo->multiplyTransform(glm::rotate(-0.5f, glm::vec3(0.0f, 1.0f, 0.0f)));
+				eParentVideo->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.6f, 5.0f)));
+				eParentVideo->addChild(eV);
+			}
 
-			VESceneNode* eV, * eParentVideo;
-			eParentVideo = getSceneManagerPointer()->createSceneNode("The VideoCube Parent", pScene, glm::mat4(1.0));
-			VECHECKPOINTER(eV = getSceneManagerPointer()->loadModel("The VideoCubeVideo", "../../media/models/video/crateVideo", "cube.obj"));
-			eParentVideo->multiplyTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1.6f, 1.2f, 1.6f)));
-			eParentVideo->multiplyTransform(glm::rotate(glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)));
-			eParentVideo->multiplyTransform(glm::rotate(-0.5f, glm::vec3(0.0f, 1.0f, 0.0f)));
-			eParentVideo->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.6f, 5.0f)));
-			eParentVideo->addChild(eV);
-
+			{
+				VESceneNode* eV, * eParentVideo;
+				eParentVideo = getSceneManagerPointer()->createSceneNode("The VideoSphere Parent", pScene, glm::mat4(1.0));
+				VECHECKPOINTER(eV = getSceneManagerPointer()->loadModel("The VideoSphereVideo", "../../media/models/video/sphere", "sphere.obj"));
+				eParentVideo->multiplyTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1.6f, 1.2f, 1.6f)));
+				eParentVideo->multiplyTransform(glm::rotate(glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)));
+				eParentVideo->multiplyTransform(glm::rotate(-0.5f, glm::vec3(0.0f, 1.0f, 0.0f)));
+				eParentVideo->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 20.0f, 2.0f)));
+				eParentVideo->addChild(eV);
+			}
 			m_irrklangEngine->play2D("../../media/sounds/ophelia.wav", true);
 		};
 	};
 
 
-
-	uint32_t g_score = 0;				//derzeitiger Punktestand
-	double g_time = 30.0;				//zeit die noch übrig ist
-	bool g_gameLost = false;			//true... das Spiel wurde verloren
-	bool g_restart = false;			//true...das Spiel soll neu gestartet werden
+	double g_time = 0.0;
 
 	//
 	//Zeichne das GUI
@@ -80,44 +83,25 @@ namespace ve {
 	protected:
 		
 		virtual void onDrawOverlay(veEvent event) {
+			g_time += event.dt;
+
 			VESubrender_Nuklear * pSubrender = (VESubrender_Nuklear*)getEnginePointer()->getRenderer()->getOverlay();
 			if (pSubrender == nullptr) return;
 
 			struct nk_context * ctx = pSubrender->getContext();
 
-			if (!g_gameLost) {
-				if (nk_begin(ctx, "", nk_rect(0, 0, 200, 200), NK_WINDOW_BORDER )) {
-					char outbuffer[100];
-					nk_layout_row_dynamic(ctx, 45, 1);
-					sprintf(outbuffer, "Score: %03d", g_score);
-					nk_label(ctx, outbuffer, NK_TEXT_LEFT);
+			if (nk_begin(ctx, "", nk_rect(0, 0, 200, 120), NK_WINDOW_BORDER)) {
+				nk_layout_row_dynamic(ctx, 45, 1);
+				nk_label(ctx, std::format("Time: {:04.1f}", g_time).c_str(), NK_TEXT_LEFT);
 
-					nk_layout_row_dynamic(ctx, 45, 1);
-					sprintf(outbuffer, "Time: %004.1lf", g_time);
-					nk_label(ctx, outbuffer, NK_TEXT_LEFT);
-				}
+				static double fps = 0.0;
+				if (event.dt > 0)
+					fps = 0.05 / event.dt + 0.95 * fps;
+				nk_layout_row_dynamic(ctx, 30, 1);
+				nk_label(ctx, std::format("FPS: {:.0f}", fps).c_str(), NK_TEXT_LEFT);
+
+				nk_end(ctx);
 			}
-			else {
-				if (nk_begin(ctx, "", nk_rect(500, 500, 200, 200), NK_WINDOW_BORDER )) {
-					nk_layout_row_dynamic(ctx, 45, 1);
-					nk_label(ctx, "Game Over", NK_TEXT_LEFT);
-					if (nk_button_label(ctx, "Restart")) {
-						g_restart = true;
-					}
-				}
-
-			};
-
-			static double fps = 0.0;
-			if (event.dt > 0)
-				fps = 0.05 / event.dt + 0.95 * fps;
-			std::stringstream str;
-			str << std::setprecision(5);
-			str << "FPS " << fps;
-			nk_layout_row_dynamic(ctx, 30, 1);
-			nk_label(ctx, str.str().c_str(), NK_TEXT_LEFT);
-
-			nk_end(ctx);
 		}
 
 	public:
@@ -128,69 +112,10 @@ namespace ve {
 		virtual ~EventListenerGUI() {};
 	};
 
-	static std::default_random_engine e{ 12345 };					//Für Zufallszahlen
-	static std::uniform_real_distribution<> d{ -10.0f, 10.0f };		//Für Zufallszahlen
-
-	//
-	// Überprüfen, ob die Kamera die Kiste berührt
-	//
-	class EventListenerCollision : public VEEventListener {
-	protected:
-		virtual void onFrameStarted(veEvent event) {
-			static uint32_t cubeid = 0;
-
-			if (g_restart) {
-				g_gameLost = false;
-				g_restart = false;				
-				g_time = 30;
-				g_score = 0;
-				getSceneManagerPointer()->getSceneNode("The Cube Parent")->setPosition(glm::vec3(d(e), 1.0f, d(e)));
-				((MyVulkanEngine*)getEnginePointer())->m_irrklangEngine->play2D("../../media/sounds/ophelia.wav", true);
-				return;
-			}
-			if (g_gameLost) return;
-
-			glm::vec3 positionCube   = getSceneManagerPointer()->getSceneNode("The Cube Parent")->getPosition();
-			glm::vec3 positionCamera = getSceneManagerPointer()->getSceneNode("StandardCameraParent")->getPosition();
-
-			float distance = glm::length(positionCube - positionCamera);
-			if (distance < 1) {
-				g_score++;
-				((MyVulkanEngine*)getEnginePointer())->m_irrklangEngine->play2D("../../media/sounds/explosion.wav", false);
-				if (g_score % 10 == 0) {
-					g_time = 30;
-					((MyVulkanEngine*)getEnginePointer())->m_irrklangEngine->play2D("../../media/sounds/bell.wav", false);
-				}
-
-				VESceneNode *eParent = getSceneManagerPointer()->getSceneNode("The Cube Parent");
-				eParent->setPosition(glm::vec3(d(e), 0.5f, d(e)));
-
-				getSceneManagerPointer()->deleteSceneNodeAndChildren("The Cube"+ std::to_string(cubeid));
-				VECHECKPOINTER(getSceneManagerPointer()->loadModel("The Cube"+ std::to_string(++cubeid)  , "../../media/models/test/crate0", "cube.obj", 0, eParent) );
-			}
-
-			g_time -= event.dt;
-			if (g_time <= 0) {
-				g_gameLost = true;
-				((MyVulkanEngine*)getEnginePointer())->m_irrklangEngine->removeAllSoundSources();
-				((MyVulkanEngine*)getEnginePointer())->m_irrklangEngine->play2D("../../media/sounds/gameover.wav", false);
-			}
-		};
-
-	public:
-		///Constructor of class EventListenerCollision
-		EventListenerCollision(std::string name) : VEEventListener(name) { };
-
-		///Destructor of class EventListenerCollision
-		virtual ~EventListenerCollision() {};
-	};
-
-	
-
 	void MyVulkanEngine::registerEventListeners() {
 		VEEngine::registerEventListeners();
-		registerEventListener(new EventListenerCollision("Collision"), { veEvent::VE_EVENT_FRAME_STARTED });
 		registerEventListener(new EventListenerGUI("GUI"), { veEvent::VE_EVENT_DRAW_OVERLAY });
+		//registerEventListener(new VEEventListenerNuklearDebug("Debug"), { veEvent::VE_EVENT_DRAW_OVERLAY });
 	};
 
 }
