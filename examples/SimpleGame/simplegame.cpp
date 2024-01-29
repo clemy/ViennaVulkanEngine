@@ -52,10 +52,11 @@ namespace ve {
 				VESceneNode* eV, * eParentVideo;
 				eParentVideo = getSceneManagerPointer()->createSceneNode("The VideoCube Parent", pScene, glm::mat4(1.0));
 				VECHECKPOINTER(eV = getSceneManagerPointer()->loadModel("The VideoCubeVideo", "../../media/models/video/crateVideo", "cube.obj"));
-				eParentVideo->multiplyTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1.6f, 1.2f, 1.6f)));
+				eParentVideo->multiplyTransform(glm::scale(glm::mat4(1.0f), glm::vec3(1.8f * 4, 1.2f * 4, 0.1f)));
 				eParentVideo->multiplyTransform(glm::rotate(glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)));
-				eParentVideo->multiplyTransform(glm::rotate(-0.5f, glm::vec3(0.0f, 1.0f, 0.0f)));
-				eParentVideo->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.6f, 5.0f)));
+				eParentVideo->multiplyTransform(glm::rotate(-0.07f * glm::pi<float>(), glm::vec3(1.0f, 0.0f, 0.0f)));
+				//eParentVideo->multiplyTransform(glm::rotate(-0.5f, glm::vec3(0.0f, 1.0f, 0.0f)));
+				eParentVideo->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 3.6f, 5.0f)));
 				eParentVideo->addChild(eV);
 			}
 
@@ -68,6 +69,19 @@ namespace ve {
 				eParentVideo->multiplyTransform(glm::rotate(-0.5f, glm::vec3(0.0f, 1.0f, 0.0f)));
 				eParentVideo->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 20.0f, 2.0f)));
 				eParentVideo->addChild(eV);
+			}
+
+			for (int x = 0; x < 5; ++x) {
+				for (int y = 0; y < 5; ++y) {
+					VESceneNode* eV, * eParentVideo;
+					eParentVideo = getSceneManagerPointer()->createSceneNode("The Chair Parent" + std::to_string(x * 10 + y), pScene, glm::mat4(1.0));
+					VECHECKPOINTER(eV = getSceneManagerPointer()->loadModel("The Chair" + std::to_string(x * 10 + y), "../../media/models/video/chair", "chair.obj"));
+					eParentVideo->multiplyTransform(glm::scale(glm::mat4(1.0f), glm::vec3(0.001f, 0.001f, 0.001f)));
+					//eParentVideo->multiplyTransform(glm::rotate(glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)));
+					//eParentVideo->multiplyTransform(glm::rotate(-0.5f, glm::vec3(0.0f, 1.0f, 0.0f)));
+					eParentVideo->multiplyTransform(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f * x - 2.0f, 0.0f, 1.0f * y - 2.0f)));
+					eParentVideo->addChild(eV);
+				}
 			}
 			m_irrklangEngine->play2D("../../media/sounds/ophelia.wav", true);
 		};

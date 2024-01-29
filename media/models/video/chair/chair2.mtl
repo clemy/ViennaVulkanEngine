@@ -1,0 +1,28 @@
+newmtl Wood
+  Ns 10.0000
+  Ni 1.5000
+  d 1.0000
+  Tr 0.0000
+  Tf 1.0000 1.0000 1.0000 
+  illum 2
+  Ka 0.0000 0.0000 0.0000
+  Kd 0.5880 0.5880 0.5880
+  Ks 0.0000 0.0000 0.0000
+  Ke 0.0000 0.0000 0.0000
+  map_Kd wood_16.png
+  map_bump wood_16.png
+  map_Kn wood_16.png
+
+newmtl Leather
+  Ns 10.0000
+  Ni 1.5000
+  d 1.0000
+  Tr 0.0000
+  Tf 1.0000 1.0000 1.0000 
+  illum 2
+  Ka 0.0000 0.0000 0.0000
+  Kd 0.5880 0.5880 0.5880
+  Ks 0.0000 0.0000 0.0000
+  Ke 0.0000 0.0000 0.0000
+  map_Kd 3_orange.png
+  map_Kd 3_orange.png
